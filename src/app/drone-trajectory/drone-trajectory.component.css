@@ -1,0 +1,50 @@
+#map {
+  position: relative;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  cursor: crosshair;
+  overflow: hidden;
+}
+
+/* Simula strade come linee */
+.road {
+  position: absolute;
+  background: rgba(128, 128, 128, 0.4); /* Linea grigia semi-trasparente */
+  width: 100%; /* Le strade coprono l'intera larghezza */
+  height: 10px; /* Altezza della strada */
+}
+
+/* Marker */
+.marker {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.start {
+  background: green;
+}
+
+.end {
+  background: red;
+}
+
+.waypoint {
+  background: orange;
+}
+
+.drone {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: blue;
+}
+
+.impact-zone {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 0, 0, 0.3);
+  pointer-events: none;
+}

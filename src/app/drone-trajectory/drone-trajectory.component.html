@@ -1,0 +1,57 @@
+<div>
+  <label>
+    Altezza di partenza (km):
+    <input type="number" [(ngModel)]="startHeight" />
+  </label>
+  <label>
+    Altezza di arrivo (km):
+    <input type="number" [(ngModel)]="endHeight" />
+  </label>
+  <button (click)="simulateDroneMovement()">Start</button>
+</div>
+
+<!-- Canvas per disegnare la mappa e l'area d'impatto -->
+<div
+  id="map-container"
+  (click)="onMapClick($event)"
+  style="position: relative; width: 100%; height: 100%;"
+>
+  <canvas
+    id="map"
+    [attr.width]="canvasWidth"
+    [attr.height]="canvasHeight"
+    style="border: 1px solid #ccc; background: #f9f9f9; cursor: crosshair;"
+  ></canvas>
+
+  <!-- Punto di partenza -->
+  <div
+    *ngIf="startPoint"
+    class="marker start"
+    [style.left.px]="startPoint.x - 5"
+    [style.top.px]="startPoint.y - 5"
+  ></div>
+
+  <!-- Punti intermedi -->
+  <div
+    *ngFor="let waypoint of waypoints"
+    class="marker waypoint"
+    [style.left.px]="waypoint.x - 5"
+    [style.top.px]="waypoint.y - 5"
+  ></div>
+
+  <!-- Punto di arrivo -->
+  <div
+    *ngIf="endPoint"
+    class="marker end"
+    [style.left.px]="endPoint.x - 5"
+    [style.top.px]="endPoint.y - 5"
+  ></div>
+
+  <!-- Drone -->
+  <div
+    *ngIf="dronePosition"
+    class="drone"
+    [style.left.px]="dronePosition.x - 5"
+    [style.top.px]="dronePosition.y - 5"
+  ></div>
+</div>
