@@ -3,6 +3,8 @@ import * as turf from '@turf/turf';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import {Feature, GeoJSON, LineString} from 'geojson';
+import flatten from '@turf/flatten';
+
 
 @Component({
   selector: 'app-drone-trajectory',
@@ -23,6 +25,7 @@ export class DroneTrajectoryComponent implements OnInit {
   endPoint: { lat: number; lon: number; height: number } | null = null;
   waypoints: { lat: number; lon: number; height: number }[] = [];
   dronePosition: { lat: number; lon: number; height: number } | null = null;
+  combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
 
   startHeight: number = 20;
   endHeight: number = 10;
@@ -67,79 +70,6 @@ export class DroneTrajectoryComponent implements OnInit {
       return;
     }
 
-    // Definizione del percorso: punto di partenza, waypoints e punto di arrivo
-    const path = [this.startPoint, ...this.waypoints, this.endPoint];
-    const totalSteps = 200; // Numero totale di passi complessivi
-    const stepsPerSegment = Math.floor(totalSteps / (path.length - 1)); // Passi per ogni segmento
-
-    let step = 0;
-    let currentSegment = 0;
-
-    // 💡 **RESET DEL PERCORSO DRONE** - AZZERAMENTO ARRAY DRONE PATH
-    this.dronePathCoordinates = [];
-
-    const interval = setInterval(() => {
-      if (currentSegment >= path.length - 1) {
-        clearInterval(interval);
-        this.dronePosition = { ...path[path.length - 1] };
-
-        // 💡 **AGGIUNTA POSIZIONE FINALE AL PERCORSO**
-        this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
-
-        this.drawPoints();
-        this.drawDrone();
-
-        // 💡 **AGGIORNIAMO IL BUFFER ALLA FINE DEL MOVIMENTO**
-        this.updateDronePathBuffer();
-
-        setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
-        return;
-      }
-
-      const start = path[currentSegment];
-      const end = path[currentSegment + 1];
-
-      // Incremento della posizione per ogni passo
-      const dLat = (end.lat - start.lat) / stepsPerSegment;
-      const dLon = (end.lon - start.lon) / stepsPerSegment;
-      const dHeight = (end.height - start.height) / stepsPerSegment;
-
-      const lat = start.lat + dLat * (step % stepsPerSegment);
-      const lon = start.lon + dLon * (step % stepsPerSegment);
-      const height = start.height + dHeight * (step % stepsPerSegment);
-
-      this.dronePosition = { lat, lon, height };
-
-      // 💡 **AGGIUNTA POSIZIONE CORRENTE AL PERCORSO**
-      this.dronePathCoordinates.push([lon, lat]);
-
-      // Disegnare la mappa e aggiornare il buffer
-      this.logDronePosition(lat, lon, height);
-      this.drawDrone();
-      this.drawImpactArea(lat, lon, height);
-
-      // 💡 **AGGIORNO IL BUFFER DINAMICO**
-      this.updateDronePathBuffer();
-      step++;
-
-      if (step % stepsPerSegment === 0) {
-        currentSegment++;
-      }
-
-      if (this.dronePosition) {
-        const radiusKm = this.dronePosition.height * this.zoomLevel;
-        this.updateCircleBuffer(this.dronePosition.lat, this.dronePosition.lon, radiusKm);
-      }
-
-    }, 100); // Intervallo di aggiornamento: 100ms
-  }/*
-
-  simulateDroneMovement(): void {
-    if (!this.startPoint || !this.endPoint) {
-      alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
-      return;
-    }
-
     const path = [this.startPoint, ...this.waypoints, this.endPoint];
     const totalSteps = 200;
     const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
@@ -147,7 +77,11 @@ export class DroneTrajectoryComponent implements OnInit {
     let step = 0;
     let currentSegment = 0;
 
-    let combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
+    // Inizializza combinedBuffer come una FeatureCollection
+    let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
+      type: 'FeatureCollection',
+      features: [],
+    };
 
     this.dronePathCoordinates = [];
 
@@ -159,12 +93,9 @@ export class DroneTrajectoryComponent implements OnInit {
 
         this.drawPoints();
         this.drawDrone();
-        this.updateDronePathBuffer();
 
         // Disegna il buffer finale
-        if (combinedBuffer) {
-          this.drawCombinedCircleBuffer(combinedBuffer);
-        }
+        this.drawCombinedCircleBuffer(combinedBuffer);
 
         setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
         return;
@@ -187,19 +118,18 @@ export class DroneTrajectoryComponent implements OnInit {
       this.logDronePosition(lat, lon, height);
       this.drawDrone();
 
-      // Calcola il buffer circolare corrente
       const currentBuffer = this.createCircleBuffer(lat, lon, height);
 
-      // Combina il buffer corrente con quelli precedenti
       if (currentBuffer) {
-        combinedBuffer = combinedBuffer
-          ? turf.union(combinedBuffer, currentBuffer)  as GeoJSON.Feature<GeoJSON.Polygon>
-          : currentBuffer;
-      }
+        try {
+          // Aggiungi il nuovo poligono al FeatureCollection
+          combinedBuffer.features.push(currentBuffer);
 
-      // Disegna il buffer unito
-      if (combinedBuffer) {
-        this.drawCombinedCircleBuffer(combinedBuffer);
+          // Disegna il buffer combinato aggiornato
+          this.drawCombinedCircleBuffer(combinedBuffer);
+        } catch (error) {
+          console.error('Errore durante la combinazione dei buffer:', error);
+        }
       }
 
       step++;
@@ -207,7 +137,85 @@ export class DroneTrajectoryComponent implements OnInit {
         currentSegment++;
       }
     }, 100);
-  } */
+  }
+
+
+  /*
+
+    simulateDroneMovement(): void {
+      if (!this.startPoint || !this.endPoint) {
+        alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
+        return;
+      }
+
+      const path = [this.startPoint, ...this.waypoints, this.endPoint];
+      const totalSteps = 200;
+      const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
+
+      let step = 0;
+      let currentSegment = 0;
+
+      let combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
+
+      this.dronePathCoordinates = [];
+
+      const interval = setInterval(() => {
+        if (currentSegment >= path.length - 1) {
+          clearInterval(interval);
+          this.dronePosition = { ...path[path.length - 1] };
+          this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
+
+          this.drawPoints();
+          this.drawDrone();
+          this.updateDronePathBuffer();
+
+          // Disegna il buffer finale
+          if (combinedBuffer) {
+            this.drawCombinedCircleBuffer(combinedBuffer);
+          }
+
+          setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
+          return;
+        }
+
+        const start = path[currentSegment];
+        const end = path[currentSegment + 1];
+
+        const dLat = (end.lat - start.lat) / stepsPerSegment;
+        const dLon = (end.lon - start.lon) / stepsPerSegment;
+        const dHeight = (end.height - start.height) / stepsPerSegment;
+
+        const lat = start.lat + dLat * (step % stepsPerSegment);
+        const lon = start.lon + dLon * (step % stepsPerSegment);
+        const height = start.height + dHeight * (step % stepsPerSegment);
+
+        this.dronePosition = { lat, lon, height };
+        this.dronePathCoordinates.push([lon, lat]);
+
+        this.logDronePosition(lat, lon, height);
+        this.drawDrone();
+
+        // Calcola il buffer circolare corrente
+        const currentBuffer = this.createCircleBuffer(lat, lon, height);
+
+        // Combina il buffer corrente con quelli precedenti
+        if (currentBuffer) {
+          combinedBuffer = combinedBuffer
+            ? turf.union(combinedBuffer, currentBuffer)  as GeoJSON.Feature<GeoJSON.Polygon>
+            : currentBuffer;
+        }
+
+        // Disegna il buffer unito
+        if (combinedBuffer) {
+          this.drawCombinedCircleBuffer(combinedBuffer);
+        }
+
+        step++;
+        if (step % stepsPerSegment === 0) {
+          currentSegment++;
+        }
+      }, 100);
+    } */
 
 
   zoomIn(): void {
@@ -457,31 +465,50 @@ export class DroneTrajectoryComponent implements OnInit {
   }
 
 
-  drawCombinedCircleBuffer(combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon>): void {
+  drawCombinedCircleBuffer(combinedFeatureCollection: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): void {
     const canvas = document.getElementById('map') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
 
-    // Non cancelliamo nulla, disegniamo sopra
     ctx.save();
-
     ctx.fillStyle = 'rgba(0, 255, 0, 0.2)'; // Verde semi-trasparente per il buffer
 
-    // Disegna il poligono unito
-    combinedBuffer.geometry.coordinates.forEach((ring: any) => {
-      ctx.beginPath();
-      ring.forEach(([lon, lat]: [number, number], index: number) => {
-        const { x, y } = this.latLonToCanvas(lat, lon);
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      ctx.closePath();
-      ctx.fill();
+    // Itera su ogni feature del FeatureCollection
+    combinedFeatureCollection.features.forEach((feature) => {
+      if (feature.geometry.type === 'Polygon') {
+        feature.geometry.coordinates.forEach((ring: any) => {
+          ctx.beginPath();
+          ring.forEach(([lon, lat]: [number, number], index: number) => {
+            const { x, y } = this.latLonToCanvas(lat, lon);
+            if (index === 0) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          });
+          ctx.closePath();
+          ctx.fill();
+        });
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        feature.geometry.coordinates.forEach((polygon: any) => {
+          polygon.forEach((ring: any) => {
+            ctx.beginPath();
+            ring.forEach(([lon, lat]: [number, number], index: number) => {
+              const { x, y } = this.latLonToCanvas(lat, lon);
+              if (index === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
+            });
+            ctx.closePath();
+            ctx.fill();
+          });
+        });
+      }
     });
 
     ctx.restore();
   }
+
 
 }
