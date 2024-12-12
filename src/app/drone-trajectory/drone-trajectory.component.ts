@@ -64,7 +64,7 @@ export class DroneTrajectoryComponent implements OnInit {
     }
   }
 
-  simulateDroneMovement(): void {
+ /* simulateDroneMovement(): void {
     if (!this.startPoint || !this.endPoint) {
       alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
       return;
@@ -137,8 +137,119 @@ export class DroneTrajectoryComponent implements OnInit {
         currentSegment++;
       }
     }, 100);
+  }*/
+
+  simulateDroneMovement(): void {
+    if (!this.startPoint || !this.endPoint) {
+      alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
+      return;
+    }
+
+    const path = [this.startPoint, ...this.waypoints, this.endPoint];
+    const totalSteps = 200;
+    const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
+
+    let step = 0;
+    let currentSegment = 0;
+
+    // Inizializza combinedBuffer come una FeatureCollection
+    let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
+      type: 'FeatureCollection',
+      features: [],
+    };
+
+    this.dronePathCoordinates = [];
+
+    const interval = setInterval(() => {
+      if (currentSegment >= path.length - 1) {
+        clearInterval(interval);
+        this.dronePosition = { ...path[path.length - 1] };
+        this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
+
+        this.drawPoints();
+        this.drawDrone();
+
+        // Disegna il buffer finale
+        this.drawCombinedCircleBuffer(combinedBuffer);
+
+        // Stampa l'output finale delle coordinate
+        const finalBufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
+        console.log('Buffer Combinato Finale (JSON):', JSON.stringify(finalBufferOutput, null, 2));
+
+        setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
+        return;
+      }
+
+      const start = path[currentSegment];
+      const end = path[currentSegment + 1];
+
+      const dLat = (end.lat - start.lat) / stepsPerSegment;
+      const dLon = (end.lon - start.lon) / stepsPerSegment;
+      const dHeight = (end.height - start.height) / stepsPerSegment;
+
+      const lat = start.lat + dLat * (step % stepsPerSegment);
+      const lon = start.lon + dLon * (step % stepsPerSegment);
+      const height = start.height + dHeight * (step % stepsPerSegment);
+
+      this.dronePosition = { lat, lon, height };
+      this.dronePathCoordinates.push([lon, lat]);
+
+      this.logDronePosition(lat, lon, height);
+      this.drawDrone();
+
+      const currentBuffer = this.createCircleBuffer(lat, lon, height);
+
+      if (currentBuffer) {
+        try {
+          // Aggiungi il nuovo poligono al FeatureCollection
+          combinedBuffer.features.push(currentBuffer);
+
+          // Disegna il buffer combinato aggiornato
+          this.drawCombinedCircleBuffer(combinedBuffer);
+
+          // Stampa l'output aggiornato del buffer combinato
+          const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
+          console.log('Buffer Combinato (JSON):', JSON.stringify(bufferOutput, null, 2));
+        } catch (error) {
+          console.error('Errore durante la combinazione dei buffer:', error);
+        }
+      }
+
+      step++;
+      if (step % stepsPerSegment === 0) {
+        currentSegment++;
+      }
+    }, 100);
   }
 
+  generateCombinedBufferOutput(buffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): number[][] {
+    const output: number[][] = [];
+
+    // Itera su ogni feature nella FeatureCollection
+    buffer.features.forEach((feature) => {
+      if (feature.geometry.type === 'Polygon') {
+        // Se è un poligono, estrai le coordinate
+        feature.geometry.coordinates.forEach((ring) => {
+          ring.forEach((coordinate) => {
+            // Aggiungi coordinate come [x, y, z] con z = 0
+            output.push([coordinate[0], coordinate[1], 0]);
+          });
+        });
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        // Se è un MultiPolygon, estrai i poligoni interni
+        feature.geometry.coordinates.forEach((polygon) => {
+          polygon.forEach((ring) => {
+            ring.forEach((coordinate) => {
+              // Aggiungi coordinate come [x, y, z] con z = 0
+              output.push([coordinate[0], coordinate[1], 0]);
+            });
+          });
+        });
+      }
+    });
+
+    return output;
+  }
 
   /*
 
