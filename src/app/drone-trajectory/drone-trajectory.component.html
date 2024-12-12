@@ -8,9 +8,11 @@
     <input type="number" [(ngModel)]="endHeight" />
   </label>
   <button (click)="simulateDroneMovement()">Start</button>
+  <button (click)="downloadLogs()">Scarica Log</button>
+  <button (click)="zoomIn()">Zoom In</button>
+  <button (click)="zoomOut()">Zoom Out</button>
 </div>
 
-<!-- Canvas per disegnare la mappa e l'area d'impatto -->
 <div
   id="map-container"
   (click)="onMapClick($event)"
@@ -22,36 +24,16 @@
     [attr.height]="canvasHeight"
     style="border: 1px solid #ccc; background: #f9f9f9; cursor: crosshair;"
   ></canvas>
+</div>
 
-  <!-- Punto di partenza -->
+<div style="margin-top: 20px;">
+  <h3>Log delle coordinate</h3>
   <div
-    *ngIf="startPoint"
-    class="marker start"
-    [style.left.px]="startPoint.x - 5"
-    [style.top.px]="startPoint.y - 5"
-  ></div>
-
-  <!-- Punti intermedi -->
-  <div
-    *ngFor="let waypoint of waypoints"
-    class="marker waypoint"
-    [style.left.px]="waypoint.x - 5"
-    [style.top.px]="waypoint.y - 5"
-  ></div>
-
-  <!-- Punto di arrivo -->
-  <div
-    *ngIf="endPoint"
-    class="marker end"
-    [style.left.px]="endPoint.x - 5"
-    [style.top.px]="endPoint.y - 5"
-  ></div>
-
-  <!-- Drone -->
-  <div
-    *ngIf="dronePosition"
-    class="drone"
-    [style.left.px]="dronePosition.x - 5"
-    [style.top.px]="dronePosition.y - 5"
-  ></div>
+    style="max-height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #f9f9f9;"
+  >
+    <ul>
+      <li *ngFor="let log of droneLogs">{{ log }}</li>
+      <li *ngFor="let log of impactLogs">{{ log }}</li>
+    </ul>
+  </div>
 </div>
