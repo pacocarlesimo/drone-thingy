@@ -2,9 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import * as turf from '@turf/turf';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import {Feature, GeoJSON, LineString} from 'geojson';
-import flatten from '@turf/flatten';
-
+import {GeoJSON} from 'geojson';
 
 @Component({
   selector: 'app-drone-trajectory',
@@ -25,14 +23,12 @@ export class DroneTrajectoryComponent implements OnInit {
   endPoint: { lat: number; lon: number; height: number } | null = null;
   waypoints: { lat: number; lon: number; height: number }[] = [];
   dronePosition: { lat: number; lon: number; height: number } | null = null;
-  combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
+  startHeight: number = 5;
+  endHeight: number = 3;
 
-  startHeight: number = 20;
-  endHeight: number = 10;
+  currentCircleLogs: string[] = [];
+  combinedBufferLogs: string[] = [];
 
-  droneLogs: string[] = [];
-  impactLogs: string[] = [];
-  impactBufferCoordinates: any[] = [];
 
   zoomLevel: number = 1.0;
   dronePathCoordinates: [number, number][] = [];
@@ -64,81 +60,6 @@ export class DroneTrajectoryComponent implements OnInit {
     }
   }
 
- /* simulateDroneMovement(): void {
-    if (!this.startPoint || !this.endPoint) {
-      alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
-      return;
-    }
-
-    const path = [this.startPoint, ...this.waypoints, this.endPoint];
-    const totalSteps = 200;
-    const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
-
-    let step = 0;
-    let currentSegment = 0;
-
-    // Inizializza combinedBuffer come una FeatureCollection
-    let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
-      type: 'FeatureCollection',
-      features: [],
-    };
-
-    this.dronePathCoordinates = [];
-
-    const interval = setInterval(() => {
-      if (currentSegment >= path.length - 1) {
-        clearInterval(interval);
-        this.dronePosition = { ...path[path.length - 1] };
-        this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
-
-        this.drawPoints();
-        this.drawDrone();
-
-        // Disegna il buffer finale
-        this.drawCombinedCircleBuffer(combinedBuffer);
-
-        setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
-        return;
-      }
-
-      const start = path[currentSegment];
-      const end = path[currentSegment + 1];
-
-      const dLat = (end.lat - start.lat) / stepsPerSegment;
-      const dLon = (end.lon - start.lon) / stepsPerSegment;
-      const dHeight = (end.height - start.height) / stepsPerSegment;
-
-      const lat = start.lat + dLat * (step % stepsPerSegment);
-      const lon = start.lon + dLon * (step % stepsPerSegment);
-      const height = start.height + dHeight * (step % stepsPerSegment);
-
-      this.dronePosition = { lat, lon, height };
-      this.dronePathCoordinates.push([lon, lat]);
-
-      this.logDronePosition(lat, lon, height);
-      this.drawDrone();
-
-      const currentBuffer = this.createCircleBuffer(lat, lon, height);
-
-      if (currentBuffer) {
-        try {
-          // Aggiungi il nuovo poligono al FeatureCollection
-          combinedBuffer.features.push(currentBuffer);
-
-          // Disegna il buffer combinato aggiornato
-          this.drawCombinedCircleBuffer(combinedBuffer);
-        } catch (error) {
-          console.error('Errore durante la combinazione dei buffer:', error);
-        }
-      }
-
-      step++;
-      if (step % stepsPerSegment === 0) {
-        currentSegment++;
-      }
-    }, 100);
-  }*/
-
   simulateDroneMovement(): void {
     if (!this.startPoint || !this.endPoint) {
       alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
@@ -146,13 +67,12 @@ export class DroneTrajectoryComponent implements OnInit {
     }
 
     const path = [this.startPoint, ...this.waypoints, this.endPoint];
-    const totalSteps = 200;
+    const totalSteps = 300;
     const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
 
     let step = 0;
     let currentSegment = 0;
 
-    // Inizializza combinedBuffer come una FeatureCollection
     let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
       type: 'FeatureCollection',
       features: [],
@@ -169,14 +89,7 @@ export class DroneTrajectoryComponent implements OnInit {
         this.drawPoints();
         this.drawDrone();
 
-        // Disegna il buffer finale
         this.drawCombinedCircleBuffer(combinedBuffer);
-
-        // Stampa l'output finale delle coordinate
-        const finalBufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
-        console.log('Buffer Combinato Finale (JSON):', JSON.stringify(finalBufferOutput, null, 2));
-
-        setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
         return;
       }
 
@@ -194,20 +107,18 @@ export class DroneTrajectoryComponent implements OnInit {
       this.dronePosition = { lat, lon, height };
       this.dronePathCoordinates.push([lon, lat]);
 
-      this.logDronePosition(lat, lon, height);
-      this.drawDrone();
+      this.updateDronePathBuffer();
 
       const currentBuffer = this.createCircleBuffer(lat, lon, height);
 
       if (currentBuffer) {
         try {
-          // Aggiungi il nuovo poligono al FeatureCollection
           combinedBuffer.features.push(currentBuffer);
+          this.logCurrentCircleBuffer(currentBuffer, [lon, lat], height);
 
-          // Disegna il buffer combinato aggiornato
           this.drawCombinedCircleBuffer(combinedBuffer);
+          this.logCombinedBufferStep(combinedBuffer);
 
-          // Stampa l'output aggiornato del buffer combinato
           const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
           console.log('Buffer Combinato (JSON):', JSON.stringify(bufferOutput, null, 2));
         } catch (error) {
@@ -225,22 +136,17 @@ export class DroneTrajectoryComponent implements OnInit {
   generateCombinedBufferOutput(buffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): number[][] {
     const output: number[][] = [];
 
-    // Itera su ogni feature nella FeatureCollection
     buffer.features.forEach((feature) => {
       if (feature.geometry.type === 'Polygon') {
-        // Se è un poligono, estrai le coordinate
         feature.geometry.coordinates.forEach((ring) => {
           ring.forEach((coordinate) => {
-            // Aggiungi coordinate come [x, y, z] con z = 0
             output.push([coordinate[0], coordinate[1], 0]);
           });
         });
       } else if (feature.geometry.type === 'MultiPolygon') {
-        // Se è un MultiPolygon, estrai i poligoni interni
         feature.geometry.coordinates.forEach((polygon) => {
           polygon.forEach((ring) => {
             ring.forEach((coordinate) => {
-              // Aggiungi coordinate come [x, y, z] con z = 0
               output.push([coordinate[0], coordinate[1], 0]);
             });
           });
@@ -251,129 +157,67 @@ export class DroneTrajectoryComponent implements OnInit {
     return output;
   }
 
-  /*
-
-    simulateDroneMovement(): void {
-      if (!this.startPoint || !this.endPoint) {
-        alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
-        return;
-      }
-
-      const path = [this.startPoint, ...this.waypoints, this.endPoint];
-      const totalSteps = 200;
-      const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
-
-      let step = 0;
-      let currentSegment = 0;
-
-      let combinedBuffer: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
-
-      this.dronePathCoordinates = [];
-
-      const interval = setInterval(() => {
-        if (currentSegment >= path.length - 1) {
-          clearInterval(interval);
-          this.dronePosition = { ...path[path.length - 1] };
-          this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
-
-          this.drawPoints();
-          this.drawDrone();
-          this.updateDronePathBuffer();
-
-          // Disegna il buffer finale
-          if (combinedBuffer) {
-            this.drawCombinedCircleBuffer(combinedBuffer);
-          }
-
-          setTimeout(() => alert('Drone arrivato al punto di arrivo!'), 500);
-          return;
-        }
-
-        const start = path[currentSegment];
-        const end = path[currentSegment + 1];
-
-        const dLat = (end.lat - start.lat) / stepsPerSegment;
-        const dLon = (end.lon - start.lon) / stepsPerSegment;
-        const dHeight = (end.height - start.height) / stepsPerSegment;
-
-        const lat = start.lat + dLat * (step % stepsPerSegment);
-        const lon = start.lon + dLon * (step % stepsPerSegment);
-        const height = start.height + dHeight * (step % stepsPerSegment);
-
-        this.dronePosition = { lat, lon, height };
-        this.dronePathCoordinates.push([lon, lat]);
-
-        this.logDronePosition(lat, lon, height);
-        this.drawDrone();
-
-        // Calcola il buffer circolare corrente
-        const currentBuffer = this.createCircleBuffer(lat, lon, height);
-
-        // Combina il buffer corrente con quelli precedenti
-        if (currentBuffer) {
-          combinedBuffer = combinedBuffer
-            ? turf.union(combinedBuffer, currentBuffer)  as GeoJSON.Feature<GeoJSON.Polygon>
-            : currentBuffer;
-        }
-
-        // Disegna il buffer unito
-        if (combinedBuffer) {
-          this.drawCombinedCircleBuffer(combinedBuffer);
-        }
-
-        step++;
-        if (step % stepsPerSegment === 0) {
-          currentSegment++;
-        }
-      }, 100);
-    } */
-
-
   zoomIn(): void {
-    this.zoomLevel *= 1.2;
+    if (!this.dronePosition) {
+      alert('Posizione del drone non presente per centrare lo zoom!');
+      return;
+    }
+
+    this.zoomLevel = Math.min(this.zoomLevel * 1.2, 10);
+    this.updateViewport(this.dronePosition.lat, this.dronePosition.lon);
     this.redrawMap();
   }
 
   zoomOut(): void {
-    this.zoomLevel /= 1.2;
+    if (!this.dronePosition) {
+      alert('Posizione del drone non presente per centrare lo zoom!');
+      return;
+    }
+
+    this.zoomLevel = Math.max(this.zoomLevel / 1.2, 1);
+    this.updateViewport(this.dronePosition.lat, this.dronePosition.lon);
     this.redrawMap();
   }
 
+  updateViewport(centerLat: number, centerLon: number): void {
+    const baseLatRange = 1.0;
+    const baseLonRange = 1.0;
+
+    const latRange = baseLatRange / this.zoomLevel;
+    const lonRange = baseLonRange / this.zoomLevel;
+
+    this.minLat = centerLat - latRange / 2;
+    this.maxLat = centerLat + latRange / 2;
+    this.minLon = centerLon - lonRange / 2;
+    this.maxLon = centerLon + lonRange / 2;
+  }
+
   redrawMap(): void {
+    const canvas = document.getElementById('map') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
     this.drawPoints();
     if (this.dronePosition) {
       this.drawDrone();
-      this.drawImpactArea(
-        this.dronePosition.lat,
-        this.dronePosition.lon,
-        this.dronePosition.height
-      );
-      //this.updateDronePathBuffer();
     }
   }
 
   updateDronePathBuffer(): void {
     if (this.dronePathCoordinates.length < 2) {
-      return; // Non possiamo calcolare un buffer con meno di 2 punti
+      return;
     }
 
-    // Create LineString from the drone path coordinates
     const line = turf.lineString(this.dronePathCoordinates);
 
-    // Wrap the LineString in a FeatureCollection
     const featureCollection = turf.featureCollection([line]);
 
-    // Define the buffer options with kilometers
     const bufferOptions: { units: 'kilometers' } = { units: 'kilometers' };
 
-    // Compute the buffer (returns a FeatureCollection)
     const bufferedFeatureCollection = turf.buffer(featureCollection, 0.1, bufferOptions as any);
 
     if (bufferedFeatureCollection && bufferedFeatureCollection.features.length > 0) {
-      // Extract the first feature (assuming it's a Polygon)
       const bufferedPolygon = bufferedFeatureCollection.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
-
-      // Pass the polygon to drawDronePathBuffer
       this.drawDronePathBuffer(bufferedPolygon);
     } else {
       console.error('Buffering failed or returned an empty FeatureCollection.');
@@ -383,16 +227,15 @@ export class DroneTrajectoryComponent implements OnInit {
   drawDronePathBuffer(bufferedLine: GeoJSON.Feature<GeoJSON.Polygon>): void {
     const canvas = document.getElementById('map') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight); // Cancella la mappa
+    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-    this.redrawMap(); // Ridisegna la mappa
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.2)'; // Colore semi-trasparente per il buffer
+    this.redrawMap();
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
 
-    // Disegnare il buffer (fatto di un poligono con un array di coordinate)
     bufferedLine.geometry.coordinates.forEach((ring: any) => {
       ctx.beginPath();
       ring.forEach(([lon, lat]: [number, number], index: number) => {
-        const { x, y } = this.latLonToCanvas(lat, lon); // Conversione da lat/lon a canvas
+        const { x, y } = this.latLonToCanvas(lat, lon);
         if (index === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -448,125 +291,79 @@ export class DroneTrajectoryComponent implements OnInit {
     ctx.fill();
   }
 
-  drawImpactArea(lat: number, lon: number, height: number): void {
-    const bufferRadiusKm = height * this.zoomLevel;
-
-    // Create a point
-    const point = turf.point([lon, lat]);
-
-    // Wrap the point in a FeatureCollection
-    const featureCollection = turf.featureCollection([point]);
-
-    // Buffer the FeatureCollection
-    const buffered = turf.buffer(featureCollection, bufferRadiusKm, { units: 'kilometers' } as any);
-
-    if (!buffered) {
-      console.error('Errore nel calcolo del buffer: buffered è undefined.');
-      return;
-    }
-
-    this.logImpactArea(lat, lon, bufferRadiusKm, buffered.features[0]?.geometry.coordinates);
-
-    const canvas = document.getElementById('map') as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d')!;
-
-    const { x, y } = this.latLonToCanvas(lat, lon);
-
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.arc(x, y, this.kmToCanvasRadius(bufferRadiusKm), 0, 2 * Math.PI);
-    ctx.fill();
-  }
-
-  kmToCanvasRadius(km: number): number {
-    const kmPerPixel = (this.maxLat - this.minLat) * 111 / this.canvasHeight;
-    return (km / kmPerPixel) * this.zoomLevel;
-  }
-
-  logImpactArea(lat: number, lon: number, radiusKm: number, bufferCoordinates: any): void {
+  logCurrentCircleBuffer(buffer: GeoJSON.Feature<GeoJSON.Polygon>, center: [number, number], radiusKm: number): void {
     const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] Centro Area Di Impatto: (lat: ${lat.toFixed(6)}, lon: ${lon.toFixed(6)}), raggio: ${radiusKm.toFixed(2)} km`;
-    this.impactLogs.push(logMessage);
 
-    this.impactBufferCoordinates.push(bufferCoordinates);
+    // Genera l'output in formato JSON per il buffer corrente
+    const bufferOutput = this.generateCombinedBufferOutput({
+      type: 'FeatureCollection',
+      features: [buffer],
+    });
+
+    const logMessage = `[${timestamp}] Buffer Corrente (Centro: [${center[0].toFixed(6)}, ${center[1].toFixed(6)}], Raggio: ${radiusKm} km)\n${JSON.stringify(bufferOutput, null, 2)}`;
+    this.currentCircleLogs.push(logMessage);
   }
 
-  logDronePosition(lat: number, lon: number, height: number): void {
+  logCombinedBufferStep(combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): void {
     const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] Posizione Del Drone: (lat: ${lat.toFixed(6)}, lon: ${lon.toFixed(6)}, altezza: ${height.toFixed(2)} km)`;
-    this.droneLogs.push(logMessage);
+
+    // Genera l'output in formato JSON per il buffer combinato
+    const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
+
+    // Log leggibile per il buffer combinato progressivo
+    const logMessage = `[${timestamp}] Buffer Combinato Progressivo:\n${JSON.stringify(bufferOutput, null, 2)}`;
+
+    // Salva il log nel log dedicato al buffer combinato
+    this.combinedBufferLogs.push(logMessage);
+
+    // (Opzionale) Mostra il log nella finestra della console
+    console.log(logMessage);
   }
+
 
   canvasToLatLon(x: number, y: number): { lat: number; lon: number } {
-    const lat = this.maxLat - (y / this.canvasHeight) * (this.maxLat - this.minLat);
-    const lon = this.minLon + (x / this.canvasWidth) * (this.maxLon - this.minLon);
+    const latRange = this.maxLat - this.minLat;
+    const lonRange = this.maxLon - this.minLon;
+
+    const aspectRatio = this.canvasWidth / this.canvasHeight;
+    const adjustedLonRange = latRange * aspectRatio;
+
+    const lat = this.maxLat - (y / this.canvasHeight) * latRange;
+    const lon = this.minLon + (x / this.canvasWidth) * adjustedLonRange;
+
     return { lat, lon };
   }
 
   latLonToCanvas(lat: number, lon: number): { x: number; y: number } {
-    const x = ((lon - this.minLon) / (this.maxLon - this.minLon)) * this.canvasWidth;
-    const y = ((this.maxLat - lat) / (this.maxLat - this.minLat)) * this.canvasHeight;
+    const latRange = this.maxLat - this.minLat;
+    const lonRange = this.maxLon - this.minLon;
+
+    const aspectRatio = this.canvasWidth / this.canvasHeight;
+    const adjustedLonRange = latRange * aspectRatio;
+
+    const x = ((lon - this.minLon) / adjustedLonRange) * this.canvasWidth;
+    const y = ((this.maxLat - lat) / latRange) * this.canvasHeight;
+
     return { x, y };
   }
-  downloadLogs(): void {
-    const logContent = [...this.droneLogs, ...this.impactLogs].join('\n');
+
+  downloadCircleLogs(): void {
+    const logContent = this.currentCircleLogs.join('\n\n');
     const blob = new Blob([logContent], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'drone_logs.txt';
+    link.download = 'current_circle_logs.txt';
     link.click();
   }
 
-  updateCircleBuffer(lat: number, lon: number, radiusKm: number): void {
-    // Create the geographic point for the circle's center
-    const point = turf.point([lon, lat]);
-
-    // Wrap the point in a FeatureCollection (opzionale per coerenza con il case drone)
-    const featureCollection = turf.featureCollection([point]);
-
-    // Define the buffer options (raggio in chilometri)
-    const bufferOptions: { units: 'kilometers' } = { units: 'kilometers' };
-
-    // Compute the buffer around the point (returns a Polygon)
-    const bufferedPolygon = turf.buffer(featureCollection, radiusKm, bufferOptions as any) as unknown as GeoJSON.Feature<GeoJSON.Polygon>;
-
-    if (bufferedPolygon) {
-      // Pass the polygon to the drawCircleBuffer function
-      this.drawCircleBuffer(bufferedPolygon);
-    } else {
-      console.error('Buffer creation failed or returned undefined.');
-    }
+  downloadCombinedBufferLogs(): void {
+    const logContent = this.combinedBufferLogs.join('\n\n');
+    const blob = new Blob([logContent], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'combined_buffer_logs.txt';
+    link.click();
   }
-
-  drawCircleBuffer(bufferedCircle: GeoJSON.Feature<GeoJSON.Polygon>): void {
-    const canvas = document.getElementById('map') as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d')!;
-
-    // NON cancelliamo nulla qui, disegniamo sopra
-    ctx.save();
-
-    ctx.fillStyle = 'rgba(255, 182, 193, 0.4)'; // Colore semi-trasparente
-
-    // Disegna il poligono buffer
-    bufferedCircle.geometry.coordinates.forEach((ring: any) => {
-      ctx.beginPath();
-      ring.forEach(([lon, lat]: [number, number], index: number) => {
-        const { x, y } = this.latLonToCanvas(lat, lon);
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    ctx.restore();
-  }
-
-
-
 
   createCircleBuffer(lat: number, lon: number, radiusKm: number): GeoJSON.Feature<GeoJSON.Polygon> | null {
     const point = turf.point([lon, lat]);
@@ -575,15 +372,14 @@ export class DroneTrajectoryComponent implements OnInit {
     return buffered || null;
   }
 
-
   drawCombinedCircleBuffer(combinedFeatureCollection: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): void {
     const canvas = document.getElementById('map') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.2)'; // Verde semi-trasparente per il buffer
+    ctx.fillStyle = 'rgba(234,147,170,0.11)'; // Colore ultra-trasparente
 
-    // Itera su ogni feature del FeatureCollection
+
     combinedFeatureCollection.features.forEach((feature) => {
       if (feature.geometry.type === 'Polygon') {
         feature.geometry.coordinates.forEach((ring: any) => {
@@ -620,6 +416,5 @@ export class DroneTrajectoryComponent implements OnInit {
 
     ctx.restore();
   }
-
 
 }

@@ -1,50 +1,109 @@
 #map {
-  position: relative;
   border: 1px solid #ccc;
-  background: #f0f0f0;
+  background: #f9f9f9;
   cursor: crosshair;
-  overflow: hidden;
 }
 
-/* Simula strade come linee */
-.road {
-  position: absolute;
-  background: rgba(128, 128, 128, 0.4); /* Linea grigia semi-trasparente */
-  width: 100%; /* Le strade coprono l'intera larghezza */
-  height: 10px; /* Altezza della strada */
+#map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin-top: 20px;
 }
 
-/* Marker */
-.marker {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 5px;
 }
 
-.start {
-  background: green;
+button:hover {
+  background-color: #0056b3;
 }
 
-.end {
-  background: red;
+.log-container {
+  max-height: 300px;
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 5px;
 }
 
-.waypoint {
-  background: orange;
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.drone {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: blue;
+li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
 }
 
-.impact-zone {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 0, 0, 0.3);
-  pointer-events: none;
+.download-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.download-btn:hover {
+  background: #0056b3;
+}
+
+.controls {
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+
+.input-field {
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.control-button {
+  padding: 10px 15px;
+  border-radius: 5px;
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.control-button:hover {
+  background: #0056b3;
+}
+
+.logs {
+  margin-top: 20px;
+  display: flex;
+  gap: 20px;
+  justify-content: space-around;
+  flex-wrap: wrap;
+}
+
+.log-section {
+  flex: 1;
+  max-width: 500px;
+}
+
+.log-section h3 {
+  text-align: center;
 }

@@ -1,39 +1,47 @@
-<div>
+<div class="controls">
   <label>
     Altezza di partenza (km):
-    <input type="number" [(ngModel)]="startHeight" />
+    <input type="number" [(ngModel)]="startHeight" class="input-field" />
   </label>
   <label>
     Altezza di arrivo (km):
-    <input type="number" [(ngModel)]="endHeight" />
+    <input type="number" [(ngModel)]="endHeight" class="input-field" />
   </label>
-  <button (click)="simulateDroneMovement()">Start</button>
-  <button (click)="downloadLogs()">Scarica Log</button>
-  <button (click)="zoomIn()">Zoom In</button>
-  <button (click)="zoomOut()">Zoom Out</button>
+  <button (click)="simulateDroneMovement()" class="control-button">Start</button>
+  <button (click)="zoomIn()" class="control-button">Zoom In</button>
+  <button (click)="zoomOut()" class="control-button">Zoom Out</button>
 </div>
 
-<div
-  id="map-container"
-  (click)="onMapClick($event)"
-  style="position: relative; width: 100%; height: 100%;"
->
+<div id="map-container" (click)="onMapClick($event)">
   <canvas
     id="map"
     [attr.width]="canvasWidth"
     [attr.height]="canvasHeight"
-    style="border: 1px solid #ccc; background: #f9f9f9; cursor: crosshair;"
   ></canvas>
 </div>
 
-<div style="margin-top: 20px;">
-  <h3>Log delle coordinate</h3>
-  <div
-    style="max-height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #f9f9f9;"
-  >
-    <ul>
-      <li *ngFor="let log of droneLogs">{{ log }}</li>
-      <li *ngFor="let log of impactLogs">{{ log }}</li>
-    </ul>
+<div class="logs">
+  <div class="log-section">
+    <h3>Log Cerchio</h3>
+    <div class="log-container">
+      <ul>
+        <li *ngFor="let log of currentCircleLogs">{{ log }}</li>
+      </ul>
+    </div>
+    <button class="download-btn" (click)="downloadCircleLogs()">
+      Scarica Log Cerchio
+    </button>
+  </div>
+
+  <div class="log-section">
+    <h3>Log Buffer Combinato</h3>
+    <div class="log-container">
+      <ul>
+        <li *ngFor="let log of combinedBufferLogs">{{ log }}</li>
+      </ul>
+    </div>
+    <button class="download-btn" (click)="downloadCombinedBufferLogs()">
+      Scarica Log Buffer Combinato
+    </button>
   </div>
 </div>
