@@ -14,10 +14,11 @@ export class DroneTrajectoryComponent implements OnInit {
   canvasWidth: number = 1200;
   canvasHeight: number = 800;
 
-  minLat: number = 40.0;
-  maxLat: number = 41.0;
-  minLon: number = 10.0;
-  maxLon: number = 11.0;
+  minLat: number = 41.7;
+  maxLat: number = 42.1;
+  minLon: number = 12.3;
+  maxLon: number = 12.7;
+
 
   startPoint: { lat: number; lon: number; height: number } | null = null;
   endPoint: { lat: number; lon: number; height: number } | null = null;
@@ -90,6 +91,9 @@ export class DroneTrajectoryComponent implements OnInit {
         this.drawDrone();
 
         this.drawCombinedCircleBuffer(combinedBuffer);
+
+        console.log('Buffer combinato finale (GeoJSON):', JSON.stringify(combinedBuffer, null, 2));
+
         return;
       }
 
@@ -119,8 +123,8 @@ export class DroneTrajectoryComponent implements OnInit {
           this.drawCombinedCircleBuffer(combinedBuffer);
           this.logCombinedBufferStep(combinedBuffer);
 
-          const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
-          console.log('Buffer Combinato (JSON):', JSON.stringify(bufferOutput, null, 2));
+          //const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
+         // console.log('Buffer Combinato (JSON):', JSON.stringify(bufferOutput, null, 2));
         } catch (error) {
           console.error('Errore durante la combinazione dei buffer:', error);
         }
@@ -307,17 +311,11 @@ export class DroneTrajectoryComponent implements OnInit {
   logCombinedBufferStep(combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): void {
     const timestamp = new Date().toLocaleTimeString();
 
-    // Genera l'output in formato JSON per il buffer combinato
     const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
 
-    // Log leggibile per il buffer combinato progressivo
     const logMessage = `[${timestamp}] Buffer Combinato Progressivo:\n${JSON.stringify(bufferOutput, null, 2)}`;
 
-    // Salva il log nel log dedicato al buffer combinato
     this.combinedBufferLogs.push(logMessage);
-
-    // (Opzionale) Mostra il log nella finestra della console
-    console.log(logMessage);
   }
 
 
@@ -377,7 +375,7 @@ export class DroneTrajectoryComponent implements OnInit {
     const ctx = canvas.getContext('2d')!;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(234,147,170,0.11)'; // Colore ultra-trasparente
+    ctx.fillStyle = 'rgba(234,147,170,0.11)';
 
 
     combinedFeatureCollection.features.forEach((feature) => {
