@@ -1,0 +1,29 @@
+<div class="controls">
+  <label>
+    Altezza di partenza (km):
+    <input
+      type="number"
+      [(ngModel)]="startHeight"
+      class="input-field"
+      placeholder="Inserisci l'altezza di partenza"
+    />
+  </label>
+  <label>
+    Altezza di arrivo (km):
+    <input
+      type="number"
+      [(ngModel)]="endHeight"
+      class="input-field"
+      placeholder="Inserisci l'altezza di arrivo"
+    />
+  </label>
+  <button (click)="buildTrajectory()" class="control-button">Start</button>
+</div>
+
+<div id="map-container" (click)="onMapClick($event)">
+  <canvas
+    id="map"
+    [attr.width]="canvasWidth"
+    [attr.height]="canvasHeight"
+  ></canvas>
+</div>

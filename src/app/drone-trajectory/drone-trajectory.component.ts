@@ -27,19 +27,9 @@ export class DroneTrajectoryComponent implements OnInit {
   startHeight: number = 5;
   endHeight: number = 3;
 
-  currentCircleLogs: string[] = [];
-  combinedBufferLogs: string[] = [];
-
-
-  zoomLevel: number = 1.0;
   dronePathCoordinates: [number, number][] = [];
 
   truncatedTangents: [number, number][][][] = [];
-
-
-
-
-
 
   ngOnInit(): void {}
 
@@ -67,212 +57,6 @@ export class DroneTrajectoryComponent implements OnInit {
       }
     }
   }
-/*
- simulateDroneMovement(): void {
-    if (!this.startPoint || !this.endPoint) {
-      alert('Seleziona prima i punti di partenza e arrivo cliccando sulla mappa.');
-      return;
-    }
-
-    const path = [this.startPoint, ...this.waypoints, this.endPoint];
-    const totalSteps = 4;
-    const stepsPerSegment = Math.floor(totalSteps / (path.length - 1));
-
-    let step = 0;
-    let currentSegment = 0;
-
-    let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
-      type: 'FeatureCollection',
-      features: [],
-    };
-
-    this.dronePathCoordinates = [];
-    let polygonCoordinates: [number, number][] = []; // Per costruire il poligono finale
-
-    const interval = setInterval(() => {
-      if (currentSegment >= path.length - 1) {
-        clearInterval(interval);
-        this.dronePosition = { ...path[path.length - 1] }; // Imposta la posizione finale del drone
-        this.dronePathCoordinates.push([this.dronePosition.lon, this.dronePosition.lat]);
-
-        this.drawPoints();
-        this.drawDrone();
-
-        // Disegna il buffer dell'ultima posizione
-        const finalBuffer = this.createCircleBuffer(
-          this.endPoint!.lat,
-          this.endPoint!.lon,
-          this.endPoint!.height
-        );
-
-        if (finalBuffer) {
-          combinedBuffer.features.push(finalBuffer); // Aggiungi l'ultima circonferenza al buffer combinato
-          this.drawCombinedCircleBuffer(combinedBuffer); // Disegna il buffer combinato aggiornato
-        }
-
-    //    console.log('Buffer combinato finale (GeoJSON):', JSON.stringify(combinedBuffer, null, 2));
-
-        // Disegna le tangenti tra i punti
-        this.drawTangentsBetweenCircles(path);
-
-
-        // Itera su ogni punto per calcolare archi e tangenti
-        for (let i = 0; i < path.length; i++) {
-          const currentPoint = path[i];
-          const previousPoint = i > 0 ? path[i - 1] : null;
-          const nextPoint = i < path.length - 1 ? path[i + 1] : null;
-
-          // Calcola le tangenti precedenti e successive
-          const tangentsPrevious = previousPoint
-            ? this.calculateTangents(
-              [previousPoint.lon, previousPoint.lat, previousPoint.height],
-              [currentPoint.lon, currentPoint.lat, currentPoint.height]
-            )
-            : null;
-
-          const tangentsNext = nextPoint
-            ? this.calculateTangents(
-              [currentPoint.lon, currentPoint.lat, currentPoint.height],
-              [nextPoint.lon, nextPoint.lat, nextPoint.height]
-            )
-            : null;
-
-
-
-
-
-          if (i === 0 && tangentsNext) {
-            const currentCircle = this.createCircleBuffer(currentPoint.lat, currentPoint.lon, currentPoint.height);
-            if (currentCircle) {
-              const arc = this.getCircularArc(
-                // @ts-ignore
-                currentCircle.geometry.coordinates[0] as [number, number][],
-                tangentsNext[1][0], // Tangente uscente verso il successivo
-                tangentsNext[0][0]  // Tangente uscente verso il successivo
-              );
-              this.drawCircularArc(arc); // Disegna SOLO l'arco esterno
-              polygonCoordinates.push(...arc);
-            }
-          }
-
-
-
-
-
-          if (i === path.length - 1 && tangentsPrevious) {
-            const currentCircle = this.createCircleBuffer(currentPoint.lat, currentPoint.lon, currentPoint.height);
-            if (currentCircle) {
-              // Calcola l'arco esterno (sezione opposta al poligono)
-              const arc = this.getCircularArc(
-                // @ts-ignore
-                currentCircle.geometry.coordinates[0] as [number, number][],
-                tangentsPrevious[0][1], // Tangente entrante dal precedente
-                tangentsPrevious[1][1]  // Tangente entrante dal precedente
-              );
-              this.drawCircularArc(arc);
-              polygonCoordinates.push(...arc);
-            }
-          }
-// Gestione dei punti intermedi
-          if (i > 0 && i < path.length - 1 && this.truncatedTangents[i - 1] && this.truncatedTangents[i]) {
-            const currentCircle = this.createCircleBuffer(currentPoint.lat, currentPoint.lon, currentPoint.height);
-
-            if (currentCircle) {
-              // Recupera i punti delle tangenti troncate
-              const pointOnPreviousTangent = this.truncatedTangents[i - 1][1][1]; // Punto finale della tangente precedente
-              const pointOnNextTangent = this.truncatedTangents[i][0][0]; // Punto iniziale della tangente successiva
-
-              if (
-                Array.isArray(pointOnPreviousTangent) &&
-                Array.isArray(pointOnNextTangent)
-              ) {
-                // Calcola l'arco tra i due punti sulla circonferenza
-                const arc = this.getCircularArcForIntermediate(
-                  currentCircle.geometry.coordinates[0] as [number, number][],
-                  pointOnPreviousTangent as unknown as [number, number],
-                  pointOnNextTangent as unknown as [number, number]
-                );
-
-                // Disegna l'arco in fucsia per evidenziare
-                this.drawCircularArcWithColor(arc, 'fuchsia');
-
-                // Aggiungi i punti dell'arco al poligono finale
-                polygonCoordinates.push(...arc);
-              } else {
-                console.error("Errore nei punti delle tangenti troncate", {
-                  pointOnPreviousTangent,
-                  pointOnNextTangent,
-                });
-              }
-            }
-          }
-
-
-
-
-
-        }
-
-        // Chiudi il poligono
-        if (polygonCoordinates.length > 0) {
-          polygonCoordinates.push(polygonCoordinates[0]); // Aggiungi il primo punto per chiudere
-        }
-
-        // Crea il GeoJSON del poligono
-        const polygonGeoJSON: GeoJSON.Feature<GeoJSON.Polygon> = {
-          type: "Feature",
-          geometry: {
-            type: "Polygon",
-            coordinates: [polygonCoordinates],
-          },
-          properties: {},
-        };
-
-       // console.log("GeoJSON del poligono:", JSON.stringify(polygonGeoJSON, null, 2));
-
-        return;
-      }
-
-      // Calcola la posizione attuale del drone per l'animazione
-      const start = path[currentSegment];
-      const end = path[currentSegment + 1];
-
-      const dLat = (end.lat - start.lat) / stepsPerSegment;
-      const dLon = (end.lon - start.lon) / stepsPerSegment;
-      const dHeight = (end.height - start.height) / stepsPerSegment;
-
-      const lat = start.lat + dLat * (step % stepsPerSegment);
-      const lon = start.lon + dLon * (step % stepsPerSegment);
-      const height = start.height + dHeight * (step % stepsPerSegment);
-
-      this.dronePosition = { lat, lon, height };
-      this.dronePathCoordinates.push([lon, lat]);
-
-      this.updateDronePathBuffer();
-
-      const currentBuffer = this.createCircleBuffer(lat, lon, height);
-
-      if (currentBuffer) {
-        try {
-          combinedBuffer.features.push(currentBuffer);
-          this.logCurrentCircleBuffer(currentBuffer, [lon, lat], height);
-
-          this.drawCombinedCircleBuffer(combinedBuffer);
-          this.logCombinedBufferStep(combinedBuffer);
-        } catch (error) {
-          console.error('Errore durante la combinazione dei buffer:', error);
-        }
-      }
-
-      step++;
-      if (step % stepsPerSegment === 0) {
-        currentSegment++;
-      }
-    }, 100);
-  }
-*/
-
-
 
   simulateDroneMovement(): void {
     if (!this.startPoint || !this.endPoint) {
@@ -440,45 +224,6 @@ export class DroneTrajectoryComponent implements OnInit {
     }, 100);
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /*
-  // Metodo per calcolare e disegnare le tangenti tra le circonferenze
-    drawTangentsBetweenCircles(path: { lat: number; lon: number; height: number }[]): void {
-      for (let i = 0; i < path.length - 1; i++) {
-        const start = path[i];
-        const end = path[i + 1];
-
-        const tangents = this.calculateTangents(
-          [start.lon, start.lat, start.height],
-          [end.lon, end.lat, end.height]
-        );
-
-        if (tangents.length > 0) {
-          this.drawTangents(tangents);
-        }
-      }
-    }*/
-
   calculateTangents(
     start: [number, number, number], // [lon, lat, radius]
     end: [number, number, number]   // [lon, lat, radius]
@@ -590,63 +335,6 @@ export class DroneTrajectoryComponent implements OnInit {
     ctx.arc(x, y, 5, 0, 2 * Math.PI);
     ctx.fill();
   }
-/*
-  drawTangentsBetweenCircles(path: { lat: number; lon: number; height: number }[]): void {
-    const allTangents: [number, number][][] = [];
-    const intersections: { tangentIndex1: number; tangentIndex2: number; intersection: [number, number] }[] = [];
-
-    // Calcola tutte le tangenti tra le coppie di cerchi
-    for (let i = 0; i < path.length - 1; i++) {
-      const start = path[i];
-      const end = path[i + 1];
-      const tangents = this.calculateTangents(
-        [start.lon, start.lat, start.height],
-        [end.lon, end.lat, end.height]
-      );
-      allTangents.push(...tangents);
-    }
-
-    // Calcola tutte le intersezioni tra ogni coppia di tangenti
-  //  console.log("Calcolo delle intersezioni tra tutte le tangenti...");
-    for (let i = 0; i < allTangents.length; i++) {
-      for (let j = i + 1; j < allTangents.length; j++) {
-        const [start1, end1] = allTangents[i];
-        const [start2, end2] = allTangents[j];
-
-        const intersection = this.calculateLineIntersection(start1, end1, start2, end2);
-
-        if (intersection) {
-   //       console.log(`Intersezione trovata tra Tangente ${i} e Tangente ${j}: (${intersection[0]}, ${intersection[1]})`);
-          intersections.push({ tangentIndex1: i, tangentIndex2: j, intersection });
-
-          // Modifica immediatamente le tangenti per preservare le parti esterne
-          if (this.calculateDistance(end1, intersection) > this.calculateDistance(start1, intersection)) {
-            allTangents[i][0] = intersection; // Mantieni la parte esterna (lontana dall'inizio)
-          } else {
-            allTangents[i][1] = intersection; // Mantieni la parte esterna (lontana dalla fine)
-          }
-
-          if (this.calculateDistance(end2, intersection) > this.calculateDistance(start2, intersection)) {
-            allTangents[j][0] = intersection; // Mantieni la parte esterna (lontana dall'inizio)
-          } else {
-            allTangents[j][1] = intersection; // Mantieni la parte esterna (lontana dalla fine)
-          }
-        }
-      }
-    }
-
-    this.truncatedTangents = [...allTangents];
-
-    console.log('Tangenti troncate:', this.truncatedTangents);
-
-    // Disegna tutte le tangenti modificate e i punti di intersezione
-    this.drawTangents(allTangents);
-    intersections.forEach(({ intersection }) => {
-      this.drawPoint(intersection, 'green'); // Disegna i punti di intersezione
-    });
-
- //   console.log("Processo completato: tutte le tangenti e intersezioni calcolate.");
-  } */
 
   drawTangentsBetweenCircles(path: { lat: number; lon: number; height: number }[]): void {
     this.truncatedTangents = []; // Reset della variabile globale
@@ -712,7 +400,6 @@ export class DroneTrajectoryComponent implements OnInit {
     });
   }
 
-
   calculateDistance(point1: [number, number], point2: [number, number]): number {
     const [x1, y1] = point1;
     const [x2, y2] = point2;
@@ -722,73 +409,6 @@ export class DroneTrajectoryComponent implements OnInit {
 
  //   console.log(`Distanza calcolata tra (${x1}, ${y1}) e (${x2}, ${y2}): ${distance.toFixed(6)}`);
     return distance;
-  }
-
-
-
-
-
-
-
-
-
-  generateCombinedBufferOutput(buffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): number[][] {
-    const output: number[][] = [];
-
-    buffer.features.forEach((feature) => {
-      if (feature.geometry.type === 'Polygon') {
-        feature.geometry.coordinates.forEach((ring) => {
-          ring.forEach((coordinate) => {
-            output.push([coordinate[0], coordinate[1], 0]);
-          });
-        });
-      } else if (feature.geometry.type === 'MultiPolygon') {
-        feature.geometry.coordinates.forEach((polygon) => {
-          polygon.forEach((ring) => {
-            ring.forEach((coordinate) => {
-              output.push([coordinate[0], coordinate[1], 0]);
-            });
-          });
-        });
-      }
-    });
-
-    return output;
-  }
-
-  zoomIn(): void {
-    if (!this.dronePosition) {
-      alert('Posizione del drone non presente per centrare lo zoom!');
-      return;
-    }
-
-    this.zoomLevel = Math.min(this.zoomLevel * 1.2, 10);
-    this.updateViewport(this.dronePosition.lat, this.dronePosition.lon);
-    this.redrawMap();
-  }
-
-  zoomOut(): void {
-    if (!this.dronePosition) {
-      alert('Posizione del drone non presente per centrare lo zoom!');
-      return;
-    }
-
-    this.zoomLevel = Math.max(this.zoomLevel / 1.2, 1);
-    this.updateViewport(this.dronePosition.lat, this.dronePosition.lon);
-    this.redrawMap();
-  }
-
-  updateViewport(centerLat: number, centerLon: number): void {
-    const baseLatRange = 1.0;
-    const baseLonRange = 1.0;
-
-    const latRange = baseLatRange / this.zoomLevel;
-    const lonRange = baseLonRange / this.zoomLevel;
-
-    this.minLat = centerLat - latRange / 2;
-    this.maxLat = centerLat + latRange / 2;
-    this.minLon = centerLon - lonRange / 2;
-    this.maxLon = centerLon + lonRange / 2;
   }
 
   redrawMap(): void {
@@ -890,30 +510,6 @@ export class DroneTrajectoryComponent implements OnInit {
     ctx.fill();
   }
 
-  logCurrentCircleBuffer(buffer: GeoJSON.Feature<GeoJSON.Polygon>, center: [number, number], radiusKm: number): void {
-    const timestamp = new Date().toLocaleTimeString();
-
-    // Genera l'output in formato JSON per il buffer corrente
-    const bufferOutput = this.generateCombinedBufferOutput({
-      type: 'FeatureCollection',
-      features: [buffer],
-    });
-
-    const logMessage = `[${timestamp}] Buffer Corrente (Centro: [${center[0].toFixed(6)}, ${center[1].toFixed(6)}], Raggio: ${radiusKm} km)\n${JSON.stringify(bufferOutput, null, 2)}`;
-    this.currentCircleLogs.push(logMessage);
-  }
-
-  logCombinedBufferStep(combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>): void {
-    const timestamp = new Date().toLocaleTimeString();
-
-    const bufferOutput = this.generateCombinedBufferOutput(combinedBuffer);
-
-    const logMessage = `[${timestamp}] Buffer Combinato Progressivo:\n${JSON.stringify(bufferOutput, null, 2)}`;
-
-    this.combinedBufferLogs.push(logMessage);
-  }
-
-
   canvasToLatLon(x: number, y: number): { lat: number; lon: number } {
     const latRange = this.maxLat - this.minLat;
     const lonRange = this.maxLon - this.minLon;
@@ -949,25 +545,6 @@ export class DroneTrajectoryComponent implements OnInit {
     const y = ((this.maxLat - lat) / latRange) * this.canvasHeight;
 
     return { x, y };
-  }
-
-
-  downloadCircleLogs(): void {
-    const logContent = this.currentCircleLogs.join('\n\n');
-    const blob = new Blob([logContent], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'current_circle_logs.txt';
-    link.click();
-  }
-
-  downloadCombinedBufferLogs(): void {
-    const logContent = this.combinedBufferLogs.join('\n\n');
-    const blob = new Blob([logContent], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'combined_buffer_logs.txt';
-    link.click();
   }
 
   createCircleBuffer(lat: number, lon: number, radiusKm: number): GeoJSON.Feature<GeoJSON.Polygon> | null {
@@ -1080,14 +657,18 @@ export class DroneTrajectoryComponent implements OnInit {
     endPoint: [number, number]
   ): [number, number][] {
     const startIndex = circleCoordinates.findIndex(
-      ([lon, lat]) => lon === startPoint[0] && lat === startPoint[1]
+      ([lon, lat]) => Math.abs(lon - startPoint[0]) < 0.00001 && Math.abs(lat - startPoint[1]) < 0.00001
     );
     const endIndex = circleCoordinates.findIndex(
-      ([lon, lat]) => lon === endPoint[0] && lat === endPoint[1]
+      ([lon, lat]) => Math.abs(lon - endPoint[0]) < 0.00001 && Math.abs(lat - endPoint[1]) < 0.00001
     );
 
     if (startIndex === -1 || endIndex === -1) {
-      console.error("Punti di partenza o arrivo non trovati sulla circonferenza");
+      console.error("Punti di partenza o arrivo non trovati sulla circonferenza", {
+        startPoint,
+        endPoint,
+        circleCoordinates,
+      });
       return [];
     }
 
@@ -1100,7 +681,6 @@ export class DroneTrajectoryComponent implements OnInit {
       ];
     }
   }
-
 
   drawCircularArcWithColor(arc: [number, number][], color: string): void {
     const canvas = document.getElementById('map') as HTMLCanvasElement;
@@ -1120,9 +700,6 @@ export class DroneTrajectoryComponent implements OnInit {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
-
-
-
 
   drawCircularArc(arc: [number, number][]): void {
     const canvas = document.getElementById('map') as HTMLCanvasElement;
