@@ -160,12 +160,8 @@ export class DroneTrajectoryComponent implements OnInit {
     let step = 0;
     let currentSegment = 0;
 
-    let combinedBuffer: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon> = {
-      type: 'FeatureCollection',
-      features: [],
-    };
-
     this.dronePathCoordinates = [];
+    let polygonCoordinates: [number, number][] = []; // Per costruire il poligono finale
 
     const interval = setInterval(() => {
       if (currentSegment >= path.length - 1) {
@@ -184,27 +180,23 @@ export class DroneTrajectoryComponent implements OnInit {
         );
 
         if (finalBuffer) {
-          combinedBuffer.features.push(finalBuffer); // Aggiungi l'ultima circonferenza al buffer combinato
-          this.drawCombinedCircleBuffer(combinedBuffer); // Disegna il buffer combinato aggiornato
+          console.log('Buffer combinato finale (GeoJSON):', JSON.stringify(finalBuffer, null, 2));
         }
-
-        console.log('Buffer combinato finale (GeoJSON):', JSON.stringify(combinedBuffer, null, 2));
 
         // Disegna le tangenti
         this.drawTangentsBetweenCircles(path);
 
-        // Calcola e disegna i semicerchi per i punti iniziale e finale
+        // Calcola e aggiungi i semicerchi per i punti iniziale e finale al poligono
         const start = path[0];
         const end = path[path.length - 1];
 
-        // Calcola le tangenti per inizio e fine
         const tangents = this.calculateTangents(
           [start.lon, start.lat, start.height],
           [end.lon, end.lat, end.height]
         );
 
         if (tangents.length > 0) {
-          // Semicerchio per il punto iniziale
+          // Calcola il semicerchio per il punto iniziale
           const startCircle = this.createCircleBuffer(start.lat, start.lon, start.height);
           if (startCircle) {
             const startArc = this.getCircularArc(
@@ -214,9 +206,13 @@ export class DroneTrajectoryComponent implements OnInit {
               tangents[0][0]  // Tangente esterna in senso antiorario
             );
             this.drawCircularArc(startArc);
+            polygonCoordinates.push(...startArc); // Aggiungi il semicerchio al poligono
           }
 
-          // Semicerchio per il punto finale
+          // Aggiungi la prima tangente al poligono
+          polygonCoordinates.push(tangents[0][0], tangents[0][1]);
+
+          // Calcola il semicerchio per il punto finale
           const endCircle = this.createCircleBuffer(end.lat, end.lon, end.height);
           if (endCircle) {
             const endArc = this.getCircularArc(
@@ -226,8 +222,29 @@ export class DroneTrajectoryComponent implements OnInit {
               tangents[1][1]  // Tangente esterna in senso orario
             );
             this.drawCircularArc(endArc);
+            polygonCoordinates.push(...endArc); // Aggiungi il semicerchio al poligono
           }
+
+          // Aggiungi la seconda tangente al poligono
+          polygonCoordinates.push(tangents[1][1], tangents[1][0]);
         }
+
+        // Chiudi il poligono
+        if (polygonCoordinates.length > 0) {
+          polygonCoordinates.push(polygonCoordinates[0]); // Aggiungi il primo punto per chiudere
+        }
+
+        // Crea il GeoJSON del poligono
+        const polygonGeoJSON: GeoJSON.Feature<GeoJSON.Polygon> = {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [polygonCoordinates],
+          },
+          properties: {},
+        };
+
+        console.log("GeoJSON del poligono:", JSON.stringify(polygonGeoJSON, null, 2));
 
         return;
       }
@@ -246,28 +263,13 @@ export class DroneTrajectoryComponent implements OnInit {
       this.dronePosition = { lat, lon, height };
       this.dronePathCoordinates.push([lon, lat]);
 
-      this.updateDronePathBuffer();
-
-      const currentBuffer = this.createCircleBuffer(lat, lon, height);
-
-      if (currentBuffer) {
-        try {
-          combinedBuffer.features.push(currentBuffer);
-          this.logCurrentCircleBuffer(currentBuffer, [lon, lat], height);
-
-          this.drawCombinedCircleBuffer(combinedBuffer);
-          this.logCombinedBufferStep(combinedBuffer);
-        } catch (error) {
-          console.error('Errore durante la combinazione dei buffer:', error);
-        }
-      }
-
       step++;
       if (step % stepsPerSegment === 0) {
         currentSegment++;
       }
     }, 100);
   }
+
 
 
 
