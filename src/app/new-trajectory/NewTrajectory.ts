@@ -232,7 +232,7 @@ export class NewTrajectoryComponent implements OnInit {
     const tangentAngle = Math.acos((r1 - r2) / d) * (180 / Math.PI);
 
     // Calcola tangenti con margine di estensione
-    const margin = 0.01; // Margine aggiuntivo (in km)
+    const margin = 0.001; // Margine aggiuntivo (in km)
     const tangent1Start = turf.destination(startPoint, r1 + margin, centerAngle + tangentAngle, { units: "kilometers" } as any);
     const tangent1End = turf.destination(endPoint, r2 + margin, centerAngle + tangentAngle, { units: "kilometers" } as any);
 
@@ -529,7 +529,7 @@ export class NewTrajectoryComponent implements OnInit {
         let endIndex2 = this.findClosestIndex(circleCoordinates, tangent1.start);
 
         // Estendi leggermente gli indici per rendere gli archi più lunghi
-        const extension = -0.2; // Numero di punti da estendere (ad esempio, 3)
+        const extension = 0; // Numero di punti da estendere (ad esempio, 3)
         startIndex1 = (startIndex1 - extension + circleCoordinates.length) % circleCoordinates.length;
         startIndex2 = (startIndex2 - extension + circleCoordinates.length) % circleCoordinates.length;
         endIndex1 = (endIndex1 + extension) % circleCoordinates.length;
@@ -538,6 +538,9 @@ export class NewTrajectoryComponent implements OnInit {
         // Ottieni i punti dell'arco in entrambe le direzioni
         const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
         const arc2 = this.getArcPoints(circleCoordinates, startIndex2, endIndex2, false);
+
+        this.drawPointDiTangenza(tangent1.start, 'black');
+        this.drawPointDiTangenza(tangent2.start, 'black');
 
         // Calcola i "centri" dei due archi
         const arc1Center = this.calculateArcCenter(arc1);
@@ -555,7 +558,16 @@ export class NewTrajectoryComponent implements OnInit {
         });
 
         // Scegli l'arco più distante
-        const selectedArc = distanceToSecondCenter1 > distanceToSecondCenter2 ? arc1 : arc2;
+        let selectedArc = distanceToSecondCenter1 > distanceToSecondCenter2 ? arc1 : arc2;
+
+        const circleCenter = turf.center(turf.featureCollection([this.circleTangents[index].circle])).geometry.coordinates as [number, number];
+        const circleDiameter = turf.distance(
+          turf.point(circleCenter),
+          turf.point(this.circleTangents[index].circle.geometry.coordinates[0][0]),
+          { units: "kilometers" } as any
+        ) * 2;
+
+        //selectedArc = this.polishArc(selectedArc, circleCenter, circleDiameter)
 
         if (selectedArc.length > 1) {
           this.savedArcs.push({ circleIndex: index, arcPoints: selectedArc });
@@ -565,7 +577,7 @@ export class NewTrajectoryComponent implements OnInit {
         this.drawCircularArcWithColor(selectedArc, 'red');
       }
 
-
+/* IMPLEMENTAZIONE PER PRENDERE SEMPRE IL CERCHIO PIU BREVE - NON è SEMPRE LA SCELTA GIUSTA
 // Caso dei cerchi intermedi
       else if (index > 0 && index < this.circleTangents.length - 1) {
         const prevOutgoingTangents = this.circleTangents[index - 1]?.outgoingTangents;
@@ -576,12 +588,10 @@ export class NewTrajectoryComponent implements OnInit {
           return;
         }
 
-        // Filtra i punti `end` delle tangenti del cerchio precedente con `effettivamenteTagliato: false`
         const prevPoints = prevOutgoingTangents
           .filter(tangent => tangent && !tangent.tagliataSuDestinazione)
           .map(t => t!.end);
 
-        // Filtra i punti `start` delle tangenti del cerchio corrente con `effettivamenteTagliato: false`
         const currentPoints = currentTouchingTangents
           .filter(tangent => !tangent.tagliataSuOrigine)
           .map(t => t.start);
@@ -598,71 +608,165 @@ export class NewTrajectoryComponent implements OnInit {
           });
         });
       }
-/*
-// Caso dell'ultimo cerchio
-      else if (index === this.circleTangents.length - 1) {
+      */
+      // Caso dei cerchi intermedi
+      else if (index > 0 && index < this.circleTangents.length - 1) {
         const prevOutgoingTangents = this.circleTangents[index - 1]?.outgoingTangents;
+        const currentTouchingTangents = outgoingTangents.filter(tangent => tangent && tangent.truncated) as Tangent[];
 
-        if (!prevOutgoingTangents) {
-          console.error("Errore: Non abbastanza tangenti valide per l'ultimo cerchio.");
+        if (!prevOutgoingTangents || currentTouchingTangents.length !== 2) {
+          console.error("Errore: Non abbastanza tangenti valide per il cerchio intermedio.");
           return;
         }
 
-        // Filtra i punti `end` delle tangenti del cerchio precedente
-        const prevPoints = prevOutgoingTangents.filter(tangent => tangent && tangent.truncated).map(t => t!.end);
+        const prevPoints = prevOutgoingTangents
+          .filter(tangent => tangent && !tangent.tagliataSuDestinazione)
+          .map(t => t!.end);
 
-        if (prevPoints.length !== 2) {
-          console.error("Errore: Non abbastanza punti di tangenza per l'ultimo cerchio.");
+        const currentPoints = currentTouchingTangents
+          .filter(tangent => tangent && !tangent.tagliataSuOrigine)
+          .map(t => t!.start);
+
+        if (prevPoints.length !== 1 || currentPoints.length !== 1) {
+          console.error("Errore: I punti effettivamente non tagliati non sono esattamente due per ciascun cerchio.");
           return;
         }
 
-        const [tangentPoint1, tangentPoint2] = prevPoints;
-
-        // Centro del cerchio N-1
-        const penultimateCircleFeature = this.circleTangents[index - 1]?.circle;
-        if (!penultimateCircleFeature) {
-          console.error("Errore: Il cerchio N-1 non è definito.");
-          return;
-        }
-        const penultimateCircleCenter = turf.center(turf.featureCollection([penultimateCircleFeature])).geometry.coordinates as [number, number];
+        // Centro del cerchio precedente
+        const prevCircleCenter = turf.center(turf.featureCollection([this.circleTangents[index - 1].circle])).geometry.coordinates as [number, number];
 
         // Calcola gli indici dei punti sulla circonferenza
-        const startIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint1);
-        const startIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint2);
+        let startIndex1 = this.findClosestIndexWithTolerance(circleCoordinates, prevPoints[0],Infinity);
+        let endIndex1 = this.findClosestIndexWithTolerance(circleCoordinates, currentPoints[0],Infinity);
 
-        const endIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint2);
-        const endIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint1);
+        // EstendE indici per rendere gli archi più lunghi
+        const extension = 0;
+        startIndex1 = (startIndex1 - extension + circleCoordinates.length) % circleCoordinates.length;
+        endIndex1 = (endIndex1 + extension) % circleCoordinates.length;
+
+        this.drawPointDiTangenza(prevPoints[0], 'black');
+        this.drawPointDiTangenza(currentPoints[0], 'black');
 
         // Ottieni i punti degli archi in entrambe le direzioni
         const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
-        const arc2 = this.getArcPoints(circleCoordinates, startIndex2, endIndex2, false);
+        const arc2 = this.getArcPoints(circleCoordinates, endIndex1, startIndex1, false);
 
         // Calcola i "centri" dei due archi
         const arc1Center = this.calculateArcCenter(arc1);
         const arc2Center = this.calculateArcCenter(arc2);
 
-        // Calcola le distanze dei centri degli archi rispetto al penultimo cerchio
-        const distanceToPenultimateCenter1 = this.calculateDistance(arc1Center, penultimateCircleCenter);
-        const distanceToPenultimateCenter2 = this.calculateDistance(arc2Center, penultimateCircleCenter);
+        // Calcola le distanze dei centri degli archi rispetto al cerchio precedente
+        const distanceToPrevCenter1 = this.calculateDistance(arc1Center, prevCircleCenter);
+        const distanceToPrevCenter2 = this.calculateDistance(arc2Center, prevCircleCenter);
 
-        console.log("Distanze tra i centri degli archi e il centro del cerchio N-1:", {
+        console.log("Distanze tra i centri degli archi e il centro del cerchio precedente:", {
           arc1Center,
-          distanceToPenultimateCenter1,
+          distanceToPrevCenter1,
           arc2Center,
-          distanceToPenultimateCenter2,
+          distanceToPrevCenter2,
         });
 
-        // Scegli l'arco più lontano dal penultimo cerchio
-        const selectedArc = distanceToPenultimateCenter1 > distanceToPenultimateCenter2 ? arc1 : arc2;
+        const arc1Length = this.calculateArcLength(arc1);
+        const arc2Length = this.calculateArcLength(arc2);
+        const maxArcLength = circleCoordinates.length * 0.8; // Lunghezza massima consentita per l'arco
+        const arc1IsValid = distanceToPrevCenter1 > distanceToPrevCenter2 && arc1Length <= maxArcLength;
+        const arc2IsValid = distanceToPrevCenter2 > distanceToPrevCenter1 && arc2Length <= maxArcLength;
+        let selectedArc: [number, number][];
+
+        if (arc1IsValid) {
+          selectedArc = arc1;
+        } else if (arc2IsValid) {
+          selectedArc = arc2;
+        } else {
+          // Se nessuno soddisfa entrambe le condizioni, scegli l'arco con il centro più distante
+          selectedArc = distanceToPrevCenter1 > distanceToPrevCenter2 ? arc1 : arc2;
+        }
+
+
+        const circleCenter = turf.center(turf.featureCollection([this.circleTangents[index].circle])).geometry.coordinates as [number, number];
+        const circleDiameter = turf.distance(
+          turf.point(circleCenter),
+          turf.point(this.circleTangents[index].circle.geometry.coordinates[0][0]),
+          { units: "kilometers" } as any
+        ) * 2;
+
+       // selectedArc = this.polishArc(selectedArc, circleCenter, circleDiameter)
+
+
+
 
         if (selectedArc.length > 1) {
           this.savedArcs.push({ circleIndex: index, arcPoints: selectedArc });
         }
 
-        // Disegna l'arco selezionato
-        this.drawCircularArcWithColor(selectedArc, 'green');
+        this.drawCircularArcWithColor(selectedArc, 'orange');
       }
-*/
+
+        /*
+        // Caso dell'ultimo cerchio
+              else if (index === this.circleTangents.length - 1) {
+                const prevOutgoingTangents = this.circleTangents[index - 1]?.outgoingTangents;
+
+                if (!prevOutgoingTangents) {
+                  console.error("Errore: Non abbastanza tangenti valide per l'ultimo cerchio.");
+                  return;
+                }
+
+                // Filtra i punti `end` delle tangenti del cerchio precedente
+                const prevPoints = prevOutgoingTangents.filter(tangent => tangent && tangent.truncated).map(t => t!.end);
+
+                if (prevPoints.length !== 2) {
+                  console.error("Errore: Non abbastanza punti di tangenza per l'ultimo cerchio.");
+                  return;
+                }
+
+                const [tangentPoint1, tangentPoint2] = prevPoints;
+
+                // Centro del cerchio N-1
+                const penultimateCircleFeature = this.circleTangents[index - 1]?.circle;
+                if (!penultimateCircleFeature) {
+                  console.error("Errore: Il cerchio N-1 non è definito.");
+                  return;
+                }
+                const penultimateCircleCenter = turf.center(turf.featureCollection([penultimateCircleFeature])).geometry.coordinates as [number, number];
+
+                // Calcola gli indici dei punti sulla circonferenza
+                const startIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint1);
+                const startIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint2);
+
+                const endIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint2);
+                const endIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint1);
+
+                // Ottieni i punti degli archi in entrambe le direzioni
+                const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
+                const arc2 = this.getArcPoints(circleCoordinates, startIndex2, endIndex2, false);
+
+                // Calcola i "centri" dei due archi
+                const arc1Center = this.calculateArcCenter(arc1);
+                const arc2Center = this.calculateArcCenter(arc2);
+
+                // Calcola le distanze dei centri degli archi rispetto al penultimo cerchio
+                const distanceToPenultimateCenter1 = this.calculateDistance(arc1Center, penultimateCircleCenter);
+                const distanceToPenultimateCenter2 = this.calculateDistance(arc2Center, penultimateCircleCenter);
+
+                console.log("Distanze tra i centri degli archi e il centro del cerchio N-1:", {
+                  arc1Center,
+                  distanceToPenultimateCenter1,
+                  arc2Center,
+                  distanceToPenultimateCenter2,
+                });
+
+                // Scegli l'arco più lontano dal penultimo cerchio
+                const selectedArc = distanceToPenultimateCenter1 > distanceToPenultimateCenter2 ? arc1 : arc2;
+
+                if (selectedArc.length > 1) {
+                  this.savedArcs.push({ circleIndex: index, arcPoints: selectedArc });
+                }
+
+                // Disegna l'arco selezionato
+                this.drawCircularArcWithColor(selectedArc, 'green');
+              }
+        */
       // Caso dell'ultimo cerchio
       else if (index === this.circleTangents.length - 1) {
         const prevOutgoingTangents = this.circleTangents[index - 1]?.outgoingTangents;
@@ -697,6 +801,9 @@ export class NewTrajectoryComponent implements OnInit {
         let endIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint2);
         let endIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint1);
 
+        this.drawPointDiTangenza(tangentPoint1, 'black');
+        this.drawPointDiTangenza(tangentPoint2, 'black');
+
         // Estendi leggermente gli indici per rendere gli archi più lunghi
         const extension = -0.2; // Numero di punti da estendere
         startIndex1 = (startIndex1 - extension + circleCoordinates.length) % circleCoordinates.length;
@@ -724,7 +831,18 @@ export class NewTrajectoryComponent implements OnInit {
         });
 
         // Scegli l'arco più lontano dal penultimo cerchio
-        const selectedArc = distanceToPenultimateCenter1 > distanceToPenultimateCenter2 ? arc1 : arc2;
+        let selectedArc = distanceToPenultimateCenter1 > distanceToPenultimateCenter2 ? arc1 : arc2;
+
+        const circleCenter = turf.center(turf.featureCollection([this.circleTangents[index].circle])).geometry.coordinates as [number, number];
+        const circleDiameter = turf.distance(
+          turf.point(circleCenter),
+          turf.point(this.circleTangents[index].circle.geometry.coordinates[0][0]),
+          { units: "kilometers" } as any
+        ) * 2;
+
+      //  selectedArc = this.polishArc(selectedArc, circleCenter, circleDiameter)
+
+
 
         if (selectedArc.length > 1) {
           this.savedArcs.push({ circleIndex: index, arcPoints: selectedArc });
@@ -869,7 +987,7 @@ export class NewTrajectoryComponent implements OnInit {
   findClosestIndexWithTolerance(
     circleCoordinates: [number, number][],
     target: [number, number],
-    tolerance: number = 0.01 // Default: tolleranza per trovare il punto più vicino
+    tolerance: number = 0.001 // Default: tolleranza per trovare il punto più vicino
   ): number {
     let closestIndex = -1;
     let minDistance = Infinity;
@@ -995,8 +1113,8 @@ export class NewTrajectoryComponent implements OnInit {
   ): [number, number][] {
     const tolerance = -2; // Tolleranza per accettare un punto vicino invece di uno esatto
 
-    let startIndex = this.findClosestIndexWithTolerance(circleCoordinates, tangentPoint1, tolerance);
-    let endIndex = this.findClosestIndexWithTolerance(circleCoordinates, tangentPoint2, tolerance);
+    let startIndex = this.findClosestIndex(circleCoordinates, tangentPoint1);
+    let endIndex = this.findClosestIndex(circleCoordinates, tangentPoint2);
 
     if (startIndex === -1 || endIndex === -1) {
       console.warn("Punti di tangenza fuori tolleranza. Cerchiamo il punto più vicino disponibile.", {
@@ -1042,6 +1160,7 @@ export class NewTrajectoryComponent implements OnInit {
 
     return length;
   }
+
   drawTrajectory(): void {
     this.buildArcs();
     this.circleTangents.forEach((circleData) => {
@@ -1115,6 +1234,22 @@ export class NewTrajectoryComponent implements OnInit {
     ctx.strokeStyle = 'blue'; // Contorno blu
     ctx.stroke();
   }
+
+  polishArc(
+    arcPoints: [number, number][],
+    circleCenter: [number, number],
+    circleDiameter: number,
+    margin: number = 0.05 // Percentuale del diametro da considerare come margine
+  ): [number, number][] {
+    const threshold = (circleDiameter / 2) - margin; // Raggio meno un piccolo margine
+
+    // Filtra i punti che sono più distanti del threshold dal centro del cerchio
+    return arcPoints.filter(point => {
+      const distance = this.calculateDistance(point, circleCenter);
+      return distance >= threshold;
+    });
+  }
+
 
   buildGeoJSON(): void {
     const features: GeoJSON.Feature[] = [];
