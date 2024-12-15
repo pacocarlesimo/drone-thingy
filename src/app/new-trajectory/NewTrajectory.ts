@@ -8,7 +8,8 @@ type Tangent = {
   start: [number, number];
   end: [number, number];
   truncated: boolean; // Indica se la tangente è passata per il processo di check sulle intersezioni
-  effettivamenteTagliato: boolean; // Indica se la tangente è stata troncata effettivamente in una o due intersezioni
+  tagliataSuOrigine: boolean,
+  tagliataSuDestinazione: boolean
 };
 
 
@@ -166,8 +167,8 @@ export class NewTrajectoryComponent implements OnInit {
         );
 
         // Popola le tangenti outgoing
-        outgoingTangents[0] = { start: calculatedTangents[0][0], end: calculatedTangents[0][1], truncated: false, effettivamenteTagliato:false };
-        outgoingTangents[1] = { start: calculatedTangents[1][0], end: calculatedTangents[1][1], truncated: false, effettivamenteTagliato:false  };
+        outgoingTangents[0] = { start: calculatedTangents[0][0], end: calculatedTangents[0][1], truncated: false, tagliataSuOrigine: false, tagliataSuDestinazione: false };
+        outgoingTangents[1] = { start: calculatedTangents[1][0], end: calculatedTangents[1][1], truncated: false,tagliataSuOrigine: false, tagliataSuDestinazione: false  };
       }
 
       this.circleTangents.push({
@@ -359,7 +360,7 @@ export class NewTrajectoryComponent implements OnInit {
             ...tangent,
             end: closestIntersection, // Troncatura dopo l'intersezione
             truncated: true,
-            effettivamenteTagliato: true,
+            tagliataSuDestinazione: true,
           };
 
           const correspondingNextTangent = nextTangents[tangentIndex];
@@ -368,7 +369,7 @@ export class NewTrajectoryComponent implements OnInit {
               ...correspondingNextTangent,
               start: closestIntersection, // Troncatura prima dell'intersezione
               truncated: true,
-              effettivamenteTagliato: true,
+              tagliataSuOrigine: true,
             };
           }
         } else {
@@ -383,7 +384,7 @@ export class NewTrajectoryComponent implements OnInit {
     this.circleTangents.forEach((current, index) => {
       if (index < this.circleTangents.length - 1) { // Escludere l'ultimo punto
         const outgoingTangents = current.outgoingTangents || [];
-        const nonTruncateTangents = outgoingTangents.filter(tangent => tangent && !tangent.effettivamenteTagliato);
+        const nonTruncateTangents = outgoingTangents.filter(tangent => tangent && !tangent.tagliataSuOrigine && !tangent.tagliataSuDestinazione);
         if (nonTruncateTangents.length === outgoingTangents.length && outgoingTangents.length > 0) {
           console.warn("Punto con entrambe le tangenti non troncate:", { index, outgoingTangents });
         }
@@ -577,12 +578,12 @@ export class NewTrajectoryComponent implements OnInit {
 
         // Filtra i punti `end` delle tangenti del cerchio precedente con `effettivamenteTagliato: false`
         const prevPoints = prevOutgoingTangents
-          .filter(tangent => tangent && !tangent.effettivamenteTagliato)
+          .filter(tangent => tangent && !tangent.tagliataSuDestinazione)
           .map(t => t!.end);
 
         // Filtra i punti `start` delle tangenti del cerchio corrente con `effettivamenteTagliato: false`
         const currentPoints = currentTouchingTangents
-          .filter(tangent => !tangent.effettivamenteTagliato)
+          .filter(tangent => !tangent.tagliataSuOrigine)
           .map(t => t.start);
 
         if (prevPoints.length !== 1 || currentPoints.length !== 1) {
@@ -1135,7 +1136,8 @@ export class NewTrajectoryComponent implements OnInit {
                 type: 'tangent',
                 index: `${index}-${tangentIndex}`,
                 truncated: tangent.truncated,
-                effettivamenteTagliato: tangent.effettivamenteTagliato,
+                tagliataSuOrigine: tangent.tagliataSuOrigine,
+                tagliataSuDestinazione: tangent.tagliataSuDestinazione,
               },
             };
             features.push(tangentFeature);
