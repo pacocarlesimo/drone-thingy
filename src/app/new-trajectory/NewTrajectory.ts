@@ -384,7 +384,7 @@ export class NewTrajectoryComponent implements OnInit {
         } else {
           // Non c'è intersezione, impostiamo SOLO il flag `truncated` a `true`
           tangent.truncated = true;
-          console.warn("Tangente non intersecata:", { index, tangentIndex, tangent });
+          //console.warn("Tangente non intersecata:", { index, tangentIndex, tangent });
         }
       });
     });
@@ -675,9 +675,19 @@ export class NewTrajectoryComponent implements OnInit {
           distanceToPrevCenter2,
         });
 
+
+        const circleCenter = turf.center(turf.featureCollection([this.circleTangents[index].circle])).geometry.coordinates as [number, number];
+
+        const circleDiameter = turf.distance(
+          turf.point(circleCenter),
+          turf.point(this.circleTangents[index].circle.geometry.coordinates[0][0]),
+          { units: "kilometers" } as any
+        ) * 2;
+
+
         const arc1Length = this.calculateArcLength(arc1);
         const arc2Length = this.calculateArcLength(arc2);
-        const maxArcLength = circleCoordinates.length * 0.8; // Lunghezza massima consentita per l'arco
+        const maxArcLength = circleCoordinates.length * 0.75; // Lunghezza massima consentita per l'arco
         const arc1IsValid = distanceToPrevCenter1 > distanceToPrevCenter2 && arc1Length <= maxArcLength;
         const arc2IsValid = distanceToPrevCenter2 > distanceToPrevCenter1 && arc2Length <= maxArcLength;
         let selectedArc: [number, number][];
@@ -687,28 +697,32 @@ export class NewTrajectoryComponent implements OnInit {
         } else if (arc2IsValid) {
           selectedArc = arc2;
         } else {
-          // Se nessuno soddisfa entrambe le condizioni, scegli l'arco con il centro più distante
-          selectedArc = distanceToPrevCenter1 > distanceToPrevCenter2 ? arc1 : arc2;
+          // Se nessuno dei due archi è valido, collega direttamente i due punti
+          console.warn("Cerchio NUMERO -> "+index+ " Nessun arco valido, collego direttamente i due punti.", { startIndex1, endIndex1 });
+          selectedArc = [
+            prevPoints[0],
+            currentPoints[0]
+          ];
         }
 
+         let added = false;
 
-        const circleCenter = turf.center(turf.featureCollection([this.circleTangents[index].circle])).geometry.coordinates as [number, number];
-        const circleDiameter = turf.distance(
-          turf.point(circleCenter),
-          turf.point(this.circleTangents[index].circle.geometry.coordinates[0][0]),
-          { units: "kilometers" } as any
-        ) * 2;
-
-       // selectedArc = this.polishArc(selectedArc, circleCenter, circleDiameter)
-
-
-
-
-        if (selectedArc.length > 1) {
+        if (selectedArc.length >= 0  && selectedArc.length <=  circleCoordinates.length * 0.75) {
           this.savedArcs.push({ circleIndex: index, arcPoints: selectedArc });
+          added = true;
         }
 
-        this.drawCircularArcWithColor(selectedArc, 'orange');
+        if(selectedArc.length >= 0  && selectedArc.length <= circleCoordinates.length * 0.75 && selectedArc.length <= circleDiameter && added) {
+          this.drawCircularArcWithColor(selectedArc, 'brown');
+        }
+        else if( selectedArc.length >= 0 && selectedArc.length <= circleCoordinates.length * 0.75  && selectedArc.length > circleDiameter && added){
+          this.drawCircularArcWithColor(selectedArc, 'orange');
+        }
+        else if (added){
+          //this.drawCircularArcWithColor(selectedArc, 'purple');
+          this.savedArcs.pop();
+          console.warn("Cerchio NUMERO -> "+index+ " BAD ARC ELEMINATO");
+        }
       }
 
         /*
