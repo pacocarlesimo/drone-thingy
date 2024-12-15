@@ -16,11 +16,9 @@ type Tangent = {
 *
 * GESTIONE PER PUNTI INTERMEDI CON CIRCONFERENZA CHE RICHIEDE DUE ARCHI
 *
-* ELIMINARE / EVITARE CHE SI FORMI COLLEGAMENTO INTERNO TRA I PUNTI DELLA RICONFERENZA IN CREAZIONE DELL'ARCO PER CAUSE ANCORA NON CHIARE
-*
 * COLLEGARE EFFETTIVAMENTE TUTTE LE LINEE DEL GEOJSON PER OTTENERE UNA FIGURA CHIUSA
 *
-* CORREGGERE ERRORE DI CALCOLO PER SCELTA DI ALCUNE TIPOLOGIE DI ARCHI INTERMEDI CONSECUTIVI - SERVE VALUTARE ANGOLO
+* CORREGGERE RARO ERRORE DI CALCOLO PER SCELTA DI ALCUNE TIPOLOGIE DI ARCHI INTERMEDI CONSECUTIVI - SERVE VALUTARE ANGOLO ?
 *
 * */
 
@@ -533,22 +531,22 @@ export class NewTrajectoryComponent implements OnInit {
         const secondCircleCenter = turf.center(turf.featureCollection([secondCircleFeature])).geometry.coordinates as [number, number];
 
         // Calcola gli indici dei punti sulla circonferenza
-        let startIndex1 = this.findClosestIndex(circleCoordinates, tangent1.start);
-        let startIndex2 = this.findClosestIndex(circleCoordinates, tangent2.start);
+        let startIndex = this.findClosestIndex(circleCoordinates, tangent1.start);
+        //let startIndex2 = this.findClosestIndex(circleCoordinates, tangent2.start);
 
-        let endIndex1 = this.findClosestIndex(circleCoordinates, tangent2.start);
-        let endIndex2 = this.findClosestIndex(circleCoordinates, tangent1.start);
+        let endIndex = this.findClosestIndex(circleCoordinates, tangent2.start);
+        //let endIndex2 = this.findClosestIndex(circleCoordinates, tangent1.start);
 
         // Estendi leggermente gli indici per rendere gli archi più lunghi
-        const extension = 0; // Numero di punti da estendere (ad esempio, 3)
-        startIndex1 = (startIndex1 - extension + circleCoordinates.length) % circleCoordinates.length;
-        startIndex2 = (startIndex2 - extension + circleCoordinates.length) % circleCoordinates.length;
-        endIndex1 = (endIndex1 + extension) % circleCoordinates.length;
-        endIndex2 = (endIndex2 + extension) % circleCoordinates.length;
+        const extension = 0;
+        startIndex = (startIndex - extension + circleCoordinates.length) % circleCoordinates.length;
+        //startIndex2 = (startIndex2 - extension + circleCoordinates.length) % circleCoordinates.length;
+        endIndex = (endIndex + extension) % circleCoordinates.length;
+       // endIndex2 = (endIndex2 + extension) % circleCoordinates.length;
 
         // Ottieni i punti dell'arco in entrambe le direzioni
-        const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
-        const arc2 = this.getArcPoints(circleCoordinates, startIndex2, endIndex2, false);
+        const arc1 = this.getArcPoints(circleCoordinates, startIndex, endIndex);
+        const arc2 = this.getArcPoints(circleCoordinates, endIndex, startIndex);
 
         this.drawPointDiTangenza(tangent1.start, 'black');
         this.drawPointDiTangenza(tangent2.start, 'black');
@@ -659,8 +657,8 @@ export class NewTrajectoryComponent implements OnInit {
         this.drawPointDiTangenza(currentPoints[0], 'black');
 
         // Ottieni i punti degli archi in entrambe le direzioni
-        const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
-        const arc2 = this.getArcPoints(circleCoordinates, endIndex1, startIndex1, false);
+        const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1);
+        const arc2 = this.getArcPoints(circleCoordinates, endIndex1, startIndex1);
 
         // Calcola i "centri" dei due archi
         const arc1Center = this.calculateArcCenter(arc1);
@@ -806,25 +804,25 @@ export class NewTrajectoryComponent implements OnInit {
         const penultimateCircleCenter = turf.center(turf.featureCollection([penultimateCircleFeature])).geometry.coordinates as [number, number];
 
         // Calcola gli indici dei punti sulla circonferenza
-        let startIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint1);
-        let startIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint2);
+        let startIndex = this.findClosestIndex(circleCoordinates, tangentPoint1);
+      //  let startIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint2);
 
-        let endIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint2);
-        let endIndex2 = this.findClosestIndex(circleCoordinates, tangentPoint1);
+      //  let endIndex1 = this.findClosestIndex(circleCoordinates, tangentPoint2);
+        let endIndex = this.findClosestIndex(circleCoordinates, tangentPoint2);
 
         this.drawPointDiTangenza(tangentPoint1, 'black');
         this.drawPointDiTangenza(tangentPoint2, 'black');
 
         // Estendi leggermente gli indici per rendere gli archi più lunghi
-        const extension = -0.2; // Numero di punti da estendere
-        startIndex1 = (startIndex1 - extension + circleCoordinates.length) % circleCoordinates.length;
-        startIndex2 = (startIndex2 - extension + circleCoordinates.length) % circleCoordinates.length;
-        endIndex1 = (endIndex1 + extension) % circleCoordinates.length;
-        endIndex2 = (endIndex2 + extension) % circleCoordinates.length;
+        const extension =0; // Numero di punti da estendere
+        startIndex = (startIndex - extension + circleCoordinates.length) % circleCoordinates.length;
+      //  startIndex2 = (startIndex2 - extension + circleCoordinates.length) % circleCoordinates.length;
+        endIndex = (endIndex + extension) % circleCoordinates.length;
+        //  endIndex2 = (endIndex2 + extension) % circleCoordinates.length;
 
         // Ottieni i punti degli archi in entrambe le direzioni
-        const arc1 = this.getArcPoints(circleCoordinates, startIndex1, endIndex1, false);
-        const arc2 = this.getArcPoints(circleCoordinates, startIndex2, endIndex2, false);
+        const arc1 = this.getArcPoints(circleCoordinates, startIndex, endIndex);
+        const arc2 = this.getArcPoints(circleCoordinates, endIndex, startIndex);
 
         // Calcola i "centri" dei due archi
         const arc1Center = this.calculateArcCenter(arc1);
@@ -1060,62 +1058,51 @@ export class NewTrajectoryComponent implements OnInit {
   getArcPoints(
     circleCoordinates: [number, number][],
     startIndex: number,
-    endIndex: number,
-    isBelow: boolean
+    endIndex: number
   ): [number, number][] {
-    if (isBelow) {
-      if (startIndex <= endIndex) {
-        // Movimento in senso orario
-        return circleCoordinates.slice(startIndex, endIndex + 1);
-      } else {
-        // Attraversa il bordo della lista
-        return [
-          ...circleCoordinates.slice(startIndex),
-          ...circleCoordinates.slice(0, endIndex + 1),
-        ];
-      }
+    // Se il punto di partenza è prima del punto di arrivo nella lista
+    if (startIndex <= endIndex) {
+      // Semplice slice tra i due indici
+      return circleCoordinates.slice(startIndex, endIndex + 1);
     } else {
-      if (endIndex <= startIndex) {
-        // Movimento in senso antiorario
-        return circleCoordinates.slice(endIndex, startIndex + 1).reverse();
-      } else {
-        // Attraversa il bordo della lista
-        return [
-          ...circleCoordinates.slice(endIndex).reverse(),
-          ...circleCoordinates.slice(0, startIndex + 1).reverse(),
-        ];
+      // Attraversa il bordo della lista
+      return [
+        ...circleCoordinates.slice(startIndex), // Dal punto di partenza fino alla fine della lista
+        ...circleCoordinates.slice(0, endIndex + 1), // Dall'inizio della lista fino al punto di arrivo
+      ];
+    }
+  }
+
+
+  /*
+    getArcPointsBetweenTangents(
+      circleCoordinates: [number, number][],
+      tangentPoint1: [number, number],
+      tangentPoint2: [number, number]
+    ): [number, number][] {
+      const startIndex = this.findClosestIndex(circleCoordinates, tangentPoint1);
+      const endIndex = this.findClosestIndex(circleCoordinates, tangentPoint2);
+
+      if (startIndex === -1 || endIndex === -1) {
+        console.error("Errore: impossibile trovare gli indici sulla circonferenza.", {
+          tangentPoint1,
+          tangentPoint2,
+          circleCoordinates,
+        });
+        return [];
       }
+
+      // Ottieni i punti degli archi in entrambe le direzioni
+      const clockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, false);
+      const counterClockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, true);
+
+      // Confronta le lunghezze degli archi per selezionare quello più breve
+      const clockwiseLength = this.calculateArcLength(clockwiseArc);
+      const counterClockwiseLength = this.calculateArcLength(counterClockwiseArc);
+
+      return clockwiseLength < counterClockwiseLength ? clockwiseArc : counterClockwiseArc;
     }
-  }
-/*
-  getArcPointsBetweenTangents(
-    circleCoordinates: [number, number][],
-    tangentPoint1: [number, number],
-    tangentPoint2: [number, number]
-  ): [number, number][] {
-    const startIndex = this.findClosestIndex(circleCoordinates, tangentPoint1);
-    const endIndex = this.findClosestIndex(circleCoordinates, tangentPoint2);
-
-    if (startIndex === -1 || endIndex === -1) {
-      console.error("Errore: impossibile trovare gli indici sulla circonferenza.", {
-        tangentPoint1,
-        tangentPoint2,
-        circleCoordinates,
-      });
-      return [];
-    }
-
-    // Ottieni i punti degli archi in entrambe le direzioni
-    const clockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, false);
-    const counterClockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, true);
-
-    // Confronta le lunghezze degli archi per selezionare quello più breve
-    const clockwiseLength = this.calculateArcLength(clockwiseArc);
-    const counterClockwiseLength = this.calculateArcLength(counterClockwiseArc);
-
-    return clockwiseLength < counterClockwiseLength ? clockwiseArc : counterClockwiseArc;
-  }
-*/
+  */
 
   getArcPointsBetweenTangents(
     circleCoordinates: [number, number][],
@@ -1149,8 +1136,8 @@ export class NewTrajectoryComponent implements OnInit {
     }
 
     // Ottieni i punti degli archi in entrambe le direzioni
-    const clockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, false);
-    const counterClockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex, true);
+    const clockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex);
+    const counterClockwiseArc = this.getArcPoints(circleCoordinates, startIndex, endIndex);
 
     // Confronta le lunghezze degli archi per selezionare quello più breve
     const clockwiseLength = this.calculateArcLength(clockwiseArc);
