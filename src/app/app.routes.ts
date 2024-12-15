@@ -3,7 +3,7 @@ import { DroneTrajectoryComponent } from './drone-trajectory/drone-trajectory.co
 import {NewTrajectoryComponent} from './new-trajectory/NewTrajectory';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/drone', pathMatch: 'full' }, // Reindirizza alla pagina del drone
+  { path: '', redirectTo: '/trajectory', pathMatch: 'full' }, // Reindirizza alla pagina del drone
   { path: 'drone', component: DroneTrajectoryComponent }, // Percorso della pagina del drone
   { path: 'trajectory', component: NewTrajectoryComponent }
 ];
