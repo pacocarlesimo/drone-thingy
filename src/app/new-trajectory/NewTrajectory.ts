@@ -241,7 +241,7 @@ export class NewTrajectoryComponent implements OnInit {
     const tangentAngle = Math.acos((r1 - r2) / d) * (180 / Math.PI);
 
     // Calcola tangenti con margine di estensione
-    const margin = 0.001; // Margine aggiuntivo (in km)
+    const margin = -0.001; // Margine aggiuntivo (in km)
     const tangent1Start = turf.destination(startPoint, r1 + margin, centerAngle + tangentAngle, { units: "kilometers" } as any);
     const tangent1End = turf.destination(endPoint, r2 + margin, centerAngle + tangentAngle, { units: "kilometers" } as any);
 
@@ -1309,13 +1309,56 @@ export class NewTrajectoryComponent implements OnInit {
       features.push(arcFeature);
     });
 
-    // Creare il GeoJSON finale
     const finalGeoJSON: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: features,
     };
 
     console.log(JSON.stringify(finalGeoJSON, null, 2));
+  }
+  
+  smoothArcConnections(
+    arcs: { circleIndex: number; arcPoints: [number, number][] }[],
+    tangents: { start: [number, number]; end: [number, number] }[]
+  ): [number, number][] {
+    const result: [number, number][] = [];
+
+    for (let i = 0; i < arcs.length; i++) {
+      const currentArc = arcs[i].arcPoints;
+
+      // Tangente precedente e successiva rispetto all'arco
+      const prevTangent = tangents[i]?.end; // Fine tangente precedente
+      const nextTangent = tangents[i + 1]?.start; // Inizio tangente successiva
+
+      // Smussa e collega i punti: tangente → arco → tangente
+      if (prevTangent) {
+        result.push(this.adjustPoint(prevTangent, currentArc[0])); // Smussa punto iniziale
+      }
+
+      result.push(...currentArc); // Aggiunge tutti i punti dell'arco
+
+      if (nextTangent) {
+        result.push(this.adjustPoint(nextTangent, currentArc[currentArc.length - 1])); // Smussa punto finale
+      }
+    }
+
+    return result;
+  }
+
+// Metodo di supporto per regolare leggermente i punti
+  adjustPoint(point1: [number, number], point2: [number, number]): [number, number] {
+    const adjustmentFactor = 0.0001; // Fattore di smussamento
+    return [
+      (point1[0] + point2[0]) / 2 + adjustmentFactor,
+      (point1[1] + point2[1]) / 2 + adjustmentFactor,
+    ];
+  }
+
+
+  arePointsClose(point1: [number, number], point2: [number, number], tolerance: number): boolean {
+    const dx = point1[0] - point2[0];
+    const dy = point1[1] - point2[1];
+    return Math.sqrt(dx * dx + dy * dy) < tolerance;
   }
 
 
